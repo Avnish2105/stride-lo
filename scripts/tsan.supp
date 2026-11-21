@@ -1,0 +1,4 @@
+# ThreadSanitizer suppressions. libgomp is not TSan-instrumented: its barrier/team internals
+# show up as races. Our own code is still checked (worker/I-O threads use pthreads directly).
+called_from_lib:libgomp.so.1
+race:libgomp.so.1

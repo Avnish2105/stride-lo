@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# docker compose wrapper for STRIDE (run from the host).
+#   scripts/dc build dev                      build the dev image (ci: scripts/dc build ci)
+#   scripts/dc run --rm dev scripts/build.sh  any command inside the container
+#   scripts/dc run --rm dev bash              interactive shell
+# The repo is mounted at its own absolute host path; bags from STRIDE_BAGS_DIR (read-only)
+# appear at /data/bags. Default bags dir: the GPS-denied repo's rosbags/ if present, else ./data.
+set -euo pipefail
+ws="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export STRIDE_WS="$ws"
+export STRIDE_UID="${STRIDE_UID:-$(id -u)}"
+export STRIDE_GID="${STRIDE_GID:-$(id -g)}"
+if [[ -z "${STRIDE_BAGS_DIR:-}" ]]; then
+  if [[ -d "$HOME/GPS-denied_State_estimation_Qudrapad/rosbags" ]]; then
+    export STRIDE_BAGS_DIR="$HOME/GPS-denied_State_estimation_Qudrapad/rosbags"
+  else
+    export STRIDE_BAGS_DIR="$ws/data"
+  fi
+fi
+mkdir -p "$ws/data" "$ws/.ccache"
+exec docker compose -f "$ws/docker/compose.yml" "$@"

@@ -1,0 +1,46 @@
+# STRIDE containers. Use scripts/dc (not plain `docker compose`): it exports STRIDE_WS (the
+# repo's absolute host path, mounted at the same path so logs and compile_commands.json match
+# the host), the host uid/gid and STRIDE_BAGS_DIR (mounted read-only at /data/bags).
+#   scripts/dc build dev
+#   scripts/dc run --rm dev scripts/build.sh
+name: stride
+
+x-common: &common
+  network_mode: host
+  ipc: host
+  working_dir: ${STRIDE_WS:?run docker compose through scripts/dc}
+  environment:
+    STRIDE_WS: ${STRIDE_WS}
+    ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    DISPLAY: ${DISPLAY:-}
+    CCACHE_DIR: ${STRIDE_WS}/.ccache
+    BUILD_JOBS: ${BUILD_JOBS:-3}
+  volumes:
+    - ${STRIDE_WS}:${STRIDE_WS}
+    - ${STRIDE_BAGS_DIR}:/data/bags:ro
+    - /tmp/.X11-unix:/tmp/.X11-unix
+
+services:
+  dev:
+    <<: *common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+      args:
+        BUILD_JOBS: ${BUILD_JOBS:-3}
+        USER_UID: ${STRIDE_UID:-1000}
+        USER_GID: ${STRIDE_GID:-1000}
+    image: stride-lo:dev
+    user: "${STRIDE_UID:-1000}:${STRIDE_GID:-1000}"
+
+  ci:
+    <<: *common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: ci
+      args:
+        BUILD_JOBS: ${BUILD_JOBS:-3}
+    image: stride-lo:ci
+    user: "${STRIDE_UID:-1000}:${STRIDE_GID:-1000}"

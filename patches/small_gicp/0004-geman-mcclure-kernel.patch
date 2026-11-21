@@ -1,0 +1,52 @@
+--- a/src/third_party/small_gicp/include/small_gicp/factors/robust_kernel.hpp	2026-11-21 23:50:02.247082690 +0530
++++ b/src/third_party/small_gicp/include/small_gicp/factors/robust_kernel.hpp	2026-11-21 23:55:46.980716881 +0530
+@@ -5,6 +5,8 @@
+ #include <Eigen/Core>
+ #include <Eigen/Geometry>
+ 
++#define SMALL_GICP_STRIDE_GEMAN_MCCLURE 1
++
+ namespace small_gicp {
+ 
+ /// @brief Huber robust kernel
+@@ -50,6 +52,40 @@
+   const double c;  ///< Kernel width
+ };
+ 
++/// @brief Geman-McClure robust kernel (STRIDE patch 0004).
++///        loss(e) = 0.5 c^2 e^2 / (c^2 + e^2), weight(e) = loss'(e) / e = c^4 / (c^2 + e^2)^2
++///        (same convention as gtsam::noiseModel::mEstimator::GemanMcClure). weight(0) = 1,
++///        weight(c) = 1/4; large residuals get weight ~ c^4 / e^4 (redescending).
++struct GemanMcClure {
++public:
++  /// @brief Geman-McClure robust kernel setting
++  struct Setting {
++    double c = 1.0;  ///< Kernel scale (same unit as the error)
++  };
++
++  /// @brief Constructor
++  GemanMcClure(const Setting& setting) : c(setting.c) {}
++
++  /// @brief Compute the weight for an error
++  /// @param e Error
++  /// @return  Weight
++  double weight(double e) const {
++    const double c2 = c * c;
++    const double d = c2 + e * e;
++    return (c2 * c2) / (d * d);
++  }
++
++  /// @brief Robust loss for an error
++  double loss(double e) const {
++    const double c2 = c * c;
++    const double e2 = e * e;
++    return 0.5 * c2 * e2 / (c2 + e2);
++  }
++
++public:
++  const double c;  ///< Kernel scale
++};
++
+ /// @brief Robustify a factor with a robust kernel
+ /// @tparam Kernel  Robust kernel
+ /// @tparam Factor  Factor
