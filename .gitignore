@@ -1,0 +1,36 @@
+# colcon / ROS 2 build outputs
+build/
+install/
+log/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+compile_commands.json
+
+# C/C++ build artifacts
+*.o
+*.so
+*.a
+*.out
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Data / recordings
+*.bag
+*.db3
+*.mcap
+*.pcd
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local secrets
+.env
