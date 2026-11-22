@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lo_tools</name>
+  <version>0.1.0</version>
+  <description>STRIDE tools: deterministic bag replay (lo_replay), evaluation (RPE, NEES, false accepts, availability), bag fault injector, fault-suite and soak runners.</description>
+  <maintainer email="avnishd2105@gmail.com">avnish</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>lo_core</depend>
+  <depend>lo_ros</depend>
+  <depend>lo_msgs</depend>
+  <depend>lo_synth</depend>
+  <depend>livox_ros_driver2</depend>
+  <depend>rclcpp</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>ament_index_cpp</depend>
+
+  <exec_depend>rosbag2_py</exec_depend>
+  <exec_depend>rosbag2_storage_mcap</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

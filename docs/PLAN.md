@@ -8,8 +8,8 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 | Phase | Scope | Gate | Status |
 |---|---|---|---|
 | 0 | Context docs, Docker image, workspace, vendored small_gicp + patches, lo_msgs, skeletons, scripts | Image builds, workspace builds, unit tests run | done (CI workflows land with phase 4) |
-| 1 | Core LO: S0, S2, S5, S6, S8, lo_replay, lo_synth basics | No divergence, RPE ≤ 2% (synthetic room, outdoor_yard bags) | pending |
-| 2 | Deskew + self-filter: S1, S3, S4, bias estimator, URDF kinematic model | RPE ≤ 1% on trotting bags | pending |
+| 1 | Core LO: S0, S2, S5, S6, S8, lo_replay, lo_synth basics | No divergence, RPE ≤ 2% (synthetic room, outdoor_yard bags) | done (2026-11-22) |
+| 2 | Deskew + self-filter: S1, S3, S4, bias estimator, URDF kinematic model | RPE ≤ 1% on trotting bags | done (2026-11-22): all 25 bags ≤ 0.154% |
 | 3 | Integrity, covariance, LoFactor, adapter, demo graph, evaluate.py, κ/λ_min tuning | Mean NEES ∈ [4, 9], 0 false accepts | pending |
 | 4 | State machine, watchdogs, black box, lifecycle + supervisor, fault injector + suite, sanitizers, soak | Fault suite green, memory flat ±5% | pending |
 | 5 | lo_sim Gazebo rig + scenes, Orin tooling, TUNING.md | Full acceptance table on x86 (Orin timing reported only) | pending |
@@ -21,6 +21,24 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 - **Phase 0** (2026-11-22): `stride-lo:dev` image builds (6.75 GB: Jazzy, GTSAM 4.3.0, Livox SDK2 +
   driver, Sophus 1.22.10, Gazebo Harmonic). small_gicp v1.0.1 vendored, 4 patches apply.
   `lo_msgs` builds. Note: `LoFactor.T_ij` is spelled `t_ij` (ROS 2 lowercase field rule, I11).
+- **Phases 1–2** (2026-11-22). lo_core S0–S9 + state machine + covariance + emitter, lo_synth,
+  lo_ros node, lo_tools (replay, evaluate, fault injector, bag suite, soak). 48 unit/synthetic
+  tests green (zero allocations after warm-up, bit-identical determinism).
+  - Synthetic (13 scenarios, 0 false accepts): room RPE 0.097 %, warehouse 0.069 %, crowd
+    0.090 %, turn180 0.062 %, stairs 0.081 %; corridor / open field DEGRADED by design.
+  - GPS-denied sim bags, 25 runs (`bag_suite.py`, requests = keyframe stamps + 5 ms, NEES vs
+    1 kHz truth, κ = 20). Progression of the same suite while fixing (DECISIONS I1, I23–I30):
+
+    | suite | RPE mean of bags | deg/m | mean NEES | false accepts | availability | LOSTs |
+    |---|---|---|---|---|---|---|
+    | v1 first run | 1.165 % | 0.0153 | 6.30 | 547 | 0.925 | 142 |
+    | v2 sim calibration, graph gate, late requests | 0.191 % | 0.0085 | 4.09 | 158 | 0.994 | 1 |
+    | **v3** lever-arm deskew, velocity baselines, freeze | **0.125 %** | **0.0081** | 3.06 | 1 | 0.999 | 0 |
+    | FAST-LIO on the same segments | 0.255 % | 0.0230 | – | – | – | – |
+
+    v3 per bag: RPE 0.085–0.154 %, availability 0.999, 0–1 rejects, 0 LOSTs; yard NEES 2.8–3.1,
+    rough 2.5–4.3 (Σ conservative: κ tuning is phase 3). Timing on the x86 laptop (2 threads):
+    median 10.1 ms, p99 18.5 ms (Orin to be measured).
 
 ---
 

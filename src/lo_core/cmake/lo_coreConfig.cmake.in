@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Eigen3 3.3 NO_MODULE)
+find_dependency(Sophus)
+find_dependency(small_gicp)
+find_dependency(OpenMP)
+
+include("${CMAKE_CURRENT_LIST_DIR}/lo_coreTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/stride_flags.cmake")
+check_required_components(lo_core)
