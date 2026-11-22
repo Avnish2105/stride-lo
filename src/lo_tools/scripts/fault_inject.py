@@ -100,6 +100,8 @@ def main():
     ap.add_argument('--lidar', default='/livox/lidar')
     ap.add_argument('--imu', default='/livox/imu')
     ap.add_argument('--seed', type=int, default=1)
+    ap.add_argument('--duration', type=float, default=-1.0,
+                    help='copy only this many seconds after the first LiDAR stamp (receive time)')
     a = ap.parse_args()
     faults = [parse_fault(f) for f in a.fault]
     rng = random.Random(a.seed)
@@ -131,8 +133,11 @@ def main():
     counts = {}
     vibration = [p for k, p in faults if k == 'imu_vibration']
     dropouts = [p for k, p in faults if k == 'imu_dropout']
+    t_end_ns = None if a.duration <= 0 else int((t_first + a.duration) * 1e9)
     while reader.has_next():
         topic, data, recv = reader.read_next()
+        if t_end_ns is not None and recv > t_end_ns:
+            break
         if topic == a.lidar:
             msg = deserialize_message(data, lidar_t)
             t0 = msg.timebase * 1e-9 if msg.timebase else stamp_s(msg.header)

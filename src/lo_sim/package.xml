@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lo_sim</name>
+  <version>0.1.0</version>
+  <description>STRIDE sensor rig for live tests: lo_synth scenarios played on the ROS clock (Mid-360 CustomMsg with exact per-point times, Livox IMU, joints, URDF, ground truth) and a Gazebo Harmonic world + kinematic-rig system plugin showing the same scene and motion.</description>
+  <maintainer email="avnishd2105@gmail.com">avnish</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>lo_core</depend>
+  <depend>lo_synth</depend>
+  <depend>lo_ros</depend>
+  <depend>lo_msgs</depend>
+  <depend>livox_ros_driver2</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>rosgraph_msgs</depend>
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>lo_gtsam_adapter</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

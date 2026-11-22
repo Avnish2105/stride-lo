@@ -24,7 +24,7 @@ geometry_msgs::msg::Pose toPose(const lo::SE3 & T)
   p.position.x = T.translation().x();
   p.position.y = T.translation().y();
   p.position.z = T.translation().z();
-  const Eigen::Quaterniond q = T.unit_quaternion();
+  const Eigen::Quaterniond & q = T.unit_quaternion();
   p.orientation.x = q.x();
   p.orientation.y = q.y();
   p.orientation.z = q.z();

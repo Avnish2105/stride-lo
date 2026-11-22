@@ -38,6 +38,7 @@ install(PROGRAMS
   scripts/live_check.sh
   scripts/run_fault_suite.sh
   scripts/soak.py
+  scripts/time_offset.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

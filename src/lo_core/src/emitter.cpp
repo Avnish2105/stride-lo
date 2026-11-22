@@ -14,7 +14,7 @@ SE3 FrameRecord::motionTo(TimeNs t) const
     const int k = std::min(static_cast<int>(u), kRotSamples - 2);
     const double a = u - k;
     const SO3 & R0 = R[static_cast<std::size_t>(k)];
-    const SO3 & R1 = R[static_cast<std::size_t>(k + 1)];
+    const SO3 & R1 = R[static_cast<std::size_t>(k) + 1];
     Rt = R0 * SO3::exp(a * (R0.inverse() * R1).log());
   }
   return SE3(Rt, Rt * lever - lever + v_lidar * dt);

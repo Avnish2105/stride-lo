@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.16)
+project(lo_sim)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(STRIDE_WERROR "Treat warnings as errors" ON)
+set(STRIDE_SANITIZER "" CACHE STRING "address | undefined | thread")
+
+find_package(ament_cmake REQUIRED)
+find_package(lo_core REQUIRED)
+find_package(lo_synth REQUIRED)
+find_package(lo_ros REQUIRED)
+find_package(lo_msgs REQUIRED)
+find_package(livox_ros_driver2 REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_msgs REQUIRED)
+find_package(rosgraph_msgs REQUIRED)
+
+add_library(lo_sim_description STATIC src/rig_description.cpp)
+target_include_directories(lo_sim_description PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(lo_sim_description PUBLIC lo_synth::lo_synth)
+set_target_properties(lo_sim_description PROPERTIES POSITION_INDEPENDENT_CODE ON)
+stride_target_flags(lo_sim_description)
+# GCC 13 false positive inside libstdc++ <streambuf> (ostringstream) at -O2
+target_compile_options(lo_sim_description PRIVATE -Wno-null-dereference)
+
+add_executable(lo_sim_rig src/sensor_rig.cpp)
+target_link_libraries(lo_sim_rig PRIVATE lo_sim_description lo_ros::lo_ros_common rclcpp::rclcpp
+  ${lo_msgs_TARGETS} ${livox_ros_driver2_TARGETS} ${sensor_msgs_TARGETS} ${nav_msgs_TARGETS}
+  ${std_msgs_TARGETS} ${geometry_msgs_TARGETS} ${tf2_msgs_TARGETS} ${rosgraph_msgs_TARGETS})
+stride_target_flags(lo_sim_rig)
+
+add_executable(lo_sim_world tools/lo_sim_world.cpp)
+target_link_libraries(lo_sim_world PRIVATE lo_sim_description)
+stride_target_flags(lo_sim_world)
+
+install(TARGETS lo_sim_rig lo_sim_world DESTINATION lib/${PROJECT_NAME})
+
+# Gazebo Harmonic system plugin (optional: only where gz-sim is available)
+find_package(gz_sim_vendor QUIET)
+find_package(gz-sim QUIET)
+find_package(gz_plugin_vendor QUIET)
+find_package(gz-plugin QUIET COMPONENTS register)
+if(TARGET gz-sim::gz-sim AND TARGET gz-plugin::register)
+  add_library(lo_sim_kinematic_rig SHARED src/kinematic_rig.cpp)
+  target_link_libraries(lo_sim_kinematic_rig PRIVATE gz-sim::gz-sim gz-plugin::register lo_synth::lo_synth)
+  stride_target_flags(lo_sim_kinematic_rig)
+  # gz-sim's ISystem* interfaces have non-virtual destructors by design (Gazebo API)
+  target_compile_options(lo_sim_kinematic_rig PRIVATE -Wno-non-virtual-dtor -Wno-null-dereference)
+  install(TARGETS lo_sim_kinematic_rig LIBRARY DESTINATION lib)
+  message(STATUS "lo_sim: building the Gazebo KinematicRig plugin")
+else()
+  message(WARNING "lo_sim: gz-sim not found, Gazebo plugin skipped (lo_sim_rig still works)")
+endif()
+
+install(DIRECTORY launch rviz DESTINATION share/${PROJECT_NAME})
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/lo_sim.dsv.in")
+ament_package()

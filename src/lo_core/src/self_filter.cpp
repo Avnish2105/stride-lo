@@ -18,7 +18,7 @@ SelfFilter::SelfFilter(
 {
   if (kin_) {
     num_caps_ = kin_->numCapsules();
-    cap_a_.assign(static_cast<std::size_t>(samples_ * num_caps_), Vec3::Zero());
+    cap_a_.assign(static_cast<std::size_t>(samples_) * static_cast<std::size_t>(num_caps_), Vec3::Zero());
     cap_b_.assign(cap_a_.size(), Vec3::Zero());
     cap_r2_.resize(static_cast<std::size_t>(num_caps_));
     for (int c = 0; c < num_caps_; ++c) {
@@ -64,8 +64,8 @@ bool SelfFilter::prepare(TimeNs t_start, TimeNs t_end, const TimeRing<JointSampl
       joints_missing_ = true;
       return false;
     }
-    kin_->capsules(q_scratch_.data(), &cap_a_[static_cast<std::size_t>(s * num_caps_)],
-      &cap_b_[static_cast<std::size_t>(s * num_caps_)]);
+    kin_->capsules(q_scratch_.data(), &cap_a_[static_cast<std::size_t>(s) * static_cast<std::size_t>(num_caps_)],
+      &cap_b_[static_cast<std::size_t>(s) * static_cast<std::size_t>(num_caps_)]);
   }
   legs_ready_ = true;
   return true;
@@ -85,8 +85,8 @@ bool SelfFilter::isSelf(const Vec3 & p_lidar, TimeNs t) const
   int k = static_cast<int>(u);
   if (k >= samples_ - 1) {k = samples_ - 2;}
   const double alpha = u - static_cast<double>(k);
-  const Vec3 * a0 = &cap_a_[static_cast<std::size_t>(k * num_caps_)];
-  const Vec3 * b0 = &cap_b_[static_cast<std::size_t>(k * num_caps_)];
+  const Vec3 * a0 = &cap_a_[static_cast<std::size_t>(k) * static_cast<std::size_t>(num_caps_)];
+  const Vec3 * b0 = &cap_b_[static_cast<std::size_t>(k) * static_cast<std::size_t>(num_caps_)];
   const Vec3 * a1 = a0 + num_caps_;
   const Vec3 * b1 = b0 + num_caps_;
   for (int c = 0; c < num_caps_; ++c) {

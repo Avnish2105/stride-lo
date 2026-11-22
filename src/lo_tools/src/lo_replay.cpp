@@ -176,7 +176,7 @@ int main(int argc, char ** argv)
       return 2;
     }
     auto vec7 = [](const lo::SE3 & T) {
-        const Eigen::Quaterniond q = T.unit_quaternion();
+        const Eigen::Quaterniond & q = T.unit_quaternion();
         return std::vector<double>{T.translation().x(), T.translation().y(), T.translation().z(),
           q.x(), q.y(), q.z(), q.w()};
       };

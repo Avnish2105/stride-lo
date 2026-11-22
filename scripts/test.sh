@@ -16,6 +16,11 @@ for a in "$@"; do
 done
 suffix=""
 [ -n "$sanitizer" ] && suffix="_${sanitizer}"
+skip=(small_gicp)
+# Sanitizer runs skip lo_gtsam_adapter: the prebuilt GTSAM is not instrumented, and Eigen's
+# aligned allocations crossing into it are reported as bad frees (ASan). The adapter's tests
+# run in the Release build.
+[ -n "$sanitizer" ] && skip+=(lo_gtsam_adapter)
 if [ -z "${AMENT_PREFIX_PATH:-}" ] || [ -z "${STRIDE_UNDERLAY:-}" ]; then
   source /usr/local/bin/stride_env.sh
 fi
@@ -25,7 +30,7 @@ export ASAN_OPTIONS="detect_leaks=1:abort_on_error=1"
 export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
 export TSAN_OPTIONS="suppressions=${ws}/scripts/tsan.supp:halt_on_error=1"
 colcon --log-base "log${suffix}" test \
-  --base-paths src .stride_patched --packages-skip small_gicp \
+  --base-paths src .stride_patched --packages-skip "${skip[@]}" \
   --build-base "build${suffix}" --install-base "install${suffix}" \
   --event-handlers console_cohesion+ --return-code-on-test-failure \
   "${args[@]}"

@@ -17,7 +17,7 @@ Config syntheticConfig(const Scenario & sc, bool use_requests)
   const SE3 & a = sc.T_base_lidar;
   const SE3 & b = sc.T_lidar_imu;
   auto vec7 = [](const SE3 & T) {
-      const Eigen::Quaterniond q = T.unit_quaternion();
+      const Eigen::Quaterniond & q = T.unit_quaternion();
       return std::vector<double>{T.translation().x(), T.translation().y(), T.translation().z(),
         q.x(), q.y(), q.z(), q.w()};
     };

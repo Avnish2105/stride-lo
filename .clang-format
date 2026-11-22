@@ -1,0 +1,15 @@
+# Style of the STRIDE sources (informational; not enforced, to avoid reformat churn).
+BasedOnStyle: Google
+ColumnLimit: 110
+IndentWidth: 2
+AccessModifierOffset: -2
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterClass: true
+  AfterStruct: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: Always
+DerivePointerAlignment: false
+PointerAlignment: Middle
+ReferenceAlignment: Middle

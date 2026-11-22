@@ -174,7 +174,7 @@ bool LoNode::lookupExtrinsics(std::string & error)
   }
   // write back so the config hash and logs show the values actually used
   auto vec7 = [](const lo::SE3 & T) {
-      const Eigen::Quaterniond q = T.unit_quaternion();
+      const Eigen::Quaterniond & q = T.unit_quaternion();
       return std::vector<double>{T.translation().x(), T.translation().y(), T.translation().z(),
         q.x(), q.y(), q.z(), q.w()};
     };

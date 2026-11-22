@@ -273,8 +273,8 @@ void Simulator::generateImu()
   const ImuSpec & s = sc_.imu;
   const double dt = 1.0 / s.rate;
   const SE3 T_base_imu = sc_.T_base_lidar * sc_.T_lidar_imu;
-  const SO3 R_bi = T_base_imu.so3();
-  const Vec3 r_bi = T_base_imu.translation();
+  const SO3 & R_bi = T_base_imu.so3();
+  const Vec3 & r_bi = T_base_imu.translation();
   Vec3 bg = s.gyro_bias;
   const double sg = s.gyro_noise / std::sqrt(dt);
   const double sa = s.accel_noise / std::sqrt(dt);
@@ -372,7 +372,7 @@ void Simulator::generateScan(std::size_t k, std::vector<RawPoint> & out, TimeNs 
       refl = 12.f;
     } else {
       const SE3 T_wl = sc_.trajectory.pose(t) * sc_.T_base_lidar;
-      const Vec3 o = T_wl.translation();
+      const Vec3 & o = T_wl.translation();
       const Vec3 d = T_wl.so3() * dir_s;
       Hit hit;
       double best = sc_.max_range;

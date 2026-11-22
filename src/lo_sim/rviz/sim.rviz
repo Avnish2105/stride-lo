@@ -1,0 +1,18 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Global Options:
+    Fixed Frame: stride_odom
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: local map
+      Topic: {Value: /stride_lo/local_map}
+      Size (m): 0.03
+    - Class: rviz_default_plugins/Odometry
+      Name: STRIDE odometry
+      Topic: {Value: /stride_lo/odometry}
+      Keep: 200
+    - Class: rviz_default_plugins/Path
+      Name: graph path
+      Topic: {Value: /lo_graph_demo/path}

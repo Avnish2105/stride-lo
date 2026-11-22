@@ -2,6 +2,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
@@ -27,7 +28,8 @@ public:
   {
     if (size_ == 0) {return 0.0;}
     std::copy(values_.begin(), values_.begin() + static_cast<std::ptrdiff_t>(size_), scratch_.begin());
-    const std::size_t k = std::min(size_ - 1, static_cast<std::size_t>(p * static_cast<double>(size_ - 1) + 0.5));
+    const std::size_t k = std::min(size_ - 1,
+      static_cast<std::size_t>(std::lround(p * static_cast<double>(size_ - 1))));
     std::nth_element(scratch_.begin(), scratch_.begin() + static_cast<std::ptrdiff_t>(k),
       scratch_.begin() + static_cast<std::ptrdiff_t>(size_));
     return scratch_[k];
