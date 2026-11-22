@@ -19,7 +19,7 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 1. Orin timing (median ≤ 25 ms, p99 ≤ 50 ms; x86 laptop: 10.3 / 19.0 ms), `orin_setup.sh`.
 2. Real Mid-360 bags with ground truth: `time_offset.py` for `imu.time_offset` (the sim value
    −2.25 ms is the emulated driver latency, I34), then κ / floor / λ_min per TUNING.md (I32).
-3. A PR `feat/stride-lo` → `main` when the owner asks.
+3. PR #1 `feat/stride-lo` → `main` opened 2026-11-23 (https://github.com/Avnish2105/stride-lo/pull/1); merge is the owner's call.
 
 ## Results log
 
