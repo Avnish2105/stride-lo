@@ -21,8 +21,10 @@
     "BUILD_JOBS": "3"
   },
   "mounts": [
-    // test bags, read-only (default: the GPS-denied repo's rosbags/)
-    "source=${localEnv:STRIDE_BAGS_DIR:${localEnv:HOME}/GPS-denied_State_estimation_Qudrapad/rosbags},target=/data/bags,type=bind,readonly"
+    // test bags, read-only: the GPS-denied repo's rosbags/ (must exist on the host). Nested
+    // defaults like ${localEnv:A:${localEnv:B}} are not supported by Dev Containers; to use
+    // another bags dir, edit this path (scripts/dc honours STRIDE_BAGS_DIR instead).
+    "source=${localEnv:HOME}/GPS-denied_State_estimation_Qudrapad/rosbags,target=/data/bags,type=bind,readonly"
     // Optional, to bring the Claude login, plans and memory into the container (uncomment;
     // the sources must exist on the host):
     // ,"source=${localEnv:HOME}/.claude/projects,target=/home/dev/.claude/projects,type=bind"
