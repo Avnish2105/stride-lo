@@ -11,34 +11,15 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 | 1 | Core LO: S0, S2, S5, S6, S8, lo_replay, lo_synth basics | No divergence, RPE ≤ 2% (synthetic room, outdoor_yard bags) | done (2026-11-22) |
 | 2 | Deskew + self-filter: S1, S3, S4, bias estimator, URDF kinematic model | RPE ≤ 1% on trotting bags | done (2026-11-22): all 25 bags ≤ 0.154% |
 | 3 | Integrity, covariance, LoFactor, adapter, demo graph, evaluate.py, κ/λ_min tuning | Mean NEES ∈ [4, 9], 0 false accepts | done with a recorded deviation (2026-11-22): 0 false accepts on 25 bags, mean NEES 2.2 (conservative; band not reachable together with 0 false accepts on sim data, I32) |
-| 4 | State machine, watchdogs, black box, lifecycle + supervisor, fault injector + suite, sanitizers, soak | Fault suite green, memory flat ±5% | in progress: synthetic fault suite green; live node verified; ASan lo_core green; UBSan/TSan, soak, bag fault suite pending (see Handoff) |
-| 5 | lo_sim Gazebo rig + scenes, Orin tooling, TUNING.md | Full acceptance table on x86 (Orin timing reported only) | in progress: lo_sim (headless + Gazebo) runs live, ARCHITECTURE/TUNING/README written |
+| 4 | State machine, watchdogs, black box, lifecycle + supervisor, fault injector + suite, sanitizers, soak | Fault suite green, memory flat ±5% | done (2026-11-22): synthetic + bag fault suites 0 false accepts (I35), ASan/UBSan/TSan green on CI, 8 h soak RSS flat (0.00 %) |
+| 5 | lo_sim Gazebo rig + scenes, Orin tooling, TUNING.md | Full acceptance table on x86 (Orin timing reported only) | done on x86 (2026-11-22); Orin timing left for the robot |
 
-## Handoff (2026-11-22, laptop switched off)
+## Remaining (needs the robot / Orin)
 
-Pushed `feat/stride-lo` to GitHub so the cloud can work. Local runs were stopped before they
-finished. Resume with `git pull` (a cloud agent may have pushed fixes), then continue.
-
-**Cloud (GitHub Actions + cloud agent, needs no bags):**
-1. `ci.yml` first run: image build (GTSAM ~1 h on a runner), Release build, 62 tests, fault
-   suite, clang-tidy. Fix workflow problems.
-2. `sanitizers.yml` (ASan / UBSan / TSan). Locally ASan passed lo_core; lo_ros tests had no
-   sanitizer flags (fixed, unverified). lo_gtsam_adapter is skipped under sanitizers
-   (uninstrumented GTSAM).
-3. `soak.yml` (runs on a push whose message contains `[soak]`): 8 h synthetic, RSS flat ±5 %,
-   0 false accepts.
-4. clang-tidy: the remaining warnings are rclcpp by-value callbacks and a float loop counter
-   (non-fatal).
-
-**Needs this laptop (bags, GPU, display) or the robot:**
-5. Bag fault suite on rough 1 (interrupted after the synthetic part):
-   `run_fault_suite.sh /data/bags/batch_1118/outdoor_rough/attempt_01_seed1/bag anymal_c data/fault_bag /sim/raw/odom`.
-6. Re-run the 25-bag suite on the final code (`bag_suite.py data/suite_v5 ...`), and
-   `live_check.sh` once more.
-7. lo_sim with the Gazebo GUI (`gui:=true`; needs a display).
-8. Orin: timing (median ≤ 25 ms, p99 ≤ 50 ms), `orin_setup.sh`.
-9. Real robot bags with ground truth: `time_offset.py`, κ / floor / λ_min (TUNING.md, I32).
-10. Phase 4 and 5 commits after their gates; a PR to `main` only when the user asks.
+1. Orin timing (median ≤ 25 ms, p99 ≤ 50 ms; x86 laptop: 10.3 / 19.0 ms), `orin_setup.sh`.
+2. Real Mid-360 bags with ground truth: `time_offset.py` for `imu.time_offset` (the sim value
+   −2.25 ms is the emulated driver latency, I34), then κ / floor / λ_min per TUNING.md (I32).
+3. A PR `feat/stride-lo` → `main` when the owner asks.
 
 ## Results log
 
@@ -75,6 +56,17 @@ finished. Resume with `git pull` (a cloud agent may have pushed fixes), then con
     NEES 2.22 (1.74–3.36), t_med 10.6 ms / p99 19.8 ms.
   - Live: `live_check.sh` (ros2 bag play --clock → lifecycle node + supervisor ↔ lo_graph_demo),
     yard 1, 60 s: RPE 0.175 %, NEES 2.29, 0 false accepts, all factors on graph nodes.
+- **Phases 4–5** (2026-11-22).
+  - CI on GitHub Actions (image, Release -Werror, 62 tests, fault suite, clang-tidy), sanitizers
+    ASan/UBSan/TSan: green. First run found an uninitialised `degenerate_directions` (fixed).
+  - Soak: 8.01 h of synthetic data in one pipeline, 287 804 scans, RSS 238.7 → 238.7 MB (spread
+    0.00 %), 0 false accepts, 0 LOSTs, t_med 4.5 ms / p99 6.6 ms.
+  - Bag fault suite (rough 1): 0 false accepts on all 7 faults after the gyro-less deskew rotation
+    floor (I35), except PTP drift, which needs the PTP monitor / skew check on hardware.
+  - Final 25-bag regression (suite v5): RPE 0.125 %, 0.0081 deg/m, availability 0.999,
+    0 false accepts, mean NEES 2.22, t_med 10.3 ms / p99 19.0 ms.
+  - lo_sim live: headless room RPE 0.108 %, Gazebo crowd 0.076 % (GUI run: 0.083 %), 0 false
+    accepts.
 
 ---
 

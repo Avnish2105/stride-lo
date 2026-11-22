@@ -15,8 +15,9 @@ stride_lo:
     imu:
       accel_scale: 9.80665
       sample_convention: interval_mean  # the sim imu_emulator publishes means over (t_prev, t]
-      # Measured against the 1 kHz /sim/raw/odom: the gyro matches truth best 2.0-2.5 ms earlier
-      # than the interval-mean convention places it (rough 1 and yard 1; DECISIONS I25).
+      # = the emulated driver stamp latency (imu_errors:=realistic: latency 2 ms + jitter),
+      # measured 2.0-2.5 ms against the 1 kHz truth and by time_offset.py (DECISIONS I25, I34).
+      # Re-measure on a real robot.
       time_offset: -0.00225
     scan:
       # The sim Mid-360 emulator takes each point's geometry from the 50 Hz gpu_lidar render

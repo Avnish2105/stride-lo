@@ -523,6 +523,13 @@ void Pipeline::handleTracking(
   {
     cov_lidar *= cfg_.cov.fallback_scale;
   }
+  // Deskew without the gyro (constant LO twist) cannot follow a trotting body's roll/pitch
+  // oscillation inside a scan: 25-40 mrad rotation errors per factor on rough terrain with a
+  // 1.5 s IMU dropout (bag fault suite, DECISIONS I35). Keep the translation, drop the claim.
+  if (v.flags & flags::DESKEW_FALLBACK) {
+    const double s = cfg_.cov.fallback_rot_sigma;
+    cov_lidar.topLeftCorner<3, 3>() += s * s * Mat3::Identity();
+  }
 
   // S8
   t0 = WallClock::now();
