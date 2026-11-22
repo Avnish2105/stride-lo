@@ -43,3 +43,4 @@ install_*/
 log_*/
 .stride_patched/
 compile_commands.json
+.claude/

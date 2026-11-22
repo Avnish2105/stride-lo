@@ -42,5 +42,5 @@ jobs:
       - run: scripts/dc run --rm ci scripts/build.sh
       - name: Soak
         run: >
-          scripts/dc run --rm ci bash -c 'source install/setup.bash &&
+          scripts/dc run --rm ci bash -c 'export ROS_HOME=/tmp/ros_home && source install/setup.bash &&
           ros2 run lo_tools soak.py --hours ${{ github.event.inputs.hours || 8 }}'

@@ -20,7 +20,9 @@ struct FactorOut
   Mat6 covariance{Mat6::Identity()};       ///< [rx ry rz tx ty tz]
   std::uint8_t health{health::OK};
   Vec6 hessian_eigenvalues{Vec6::Zero()};  ///< ascending, normalised by point count
-  std::array<Vec6, 3> degenerate_directions{};   ///< unit vectors, base frame; zero if unused
+  /// unit vectors, base frame; zero if unused. Explicitly zeroed: `{}` leaves Eigen vectors
+  /// uninitialised, which published garbage in unused slots (found by TSan in CI).
+  std::array<Vec6, 3> degenerate_directions{Vec6::Zero(), Vec6::Zero(), Vec6::Zero()};
   int num_degenerate{0};
   float inlier_ratio{0.f};
   float residual_rms{0.f};

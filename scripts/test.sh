@@ -26,6 +26,8 @@ if [ -z "${AMENT_PREFIX_PATH:-}" ] || [ -z "${STRIDE_UNDERLAY:-}" ]; then
 fi
 source "install${suffix}/setup.bash"
 export OMP_DYNAMIC=false
+# CI users may have no writable home: keep ROS logs in the workspace
+export ROS_HOME="${ROS_HOME:-${ws}/log${suffix}/ros_home}"
 export ASAN_OPTIONS="detect_leaks=1:abort_on_error=1"
 export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
 export TSAN_OPTIONS="suppressions=${ws}/scripts/tsan.supp:halt_on_error=1"
