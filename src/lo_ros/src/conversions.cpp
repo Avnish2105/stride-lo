@@ -206,4 +206,26 @@ void toPointCloud2(const std::vector<lo::Vec3> & pts, std::size_t n,
   }
 }
 
+void toCustomMsg(const lo::RawScan & scan, const std::string & frame_id,
+  livox_ros_driver2::msg::CustomMsg & m)
+{
+  m.header.stamp = toStamp(scan.t0);
+  m.header.frame_id = frame_id;
+  m.timebase = static_cast<uint64_t>(scan.t0);
+  m.point_num = static_cast<uint32_t>(scan.size);
+  m.lidar_id = 0;
+  m.points.resize(scan.size);
+  for (std::size_t i = 0; i < scan.size; ++i) {
+    const lo::RawPoint & r = scan.points[i];
+    auto & p = m.points[i];
+    p.x = r.x;
+    p.y = r.y;
+    p.z = r.z;
+    p.offset_time = r.offset_ns;
+    p.reflectivity = r.reflectivity;
+    p.tag = r.tag;
+    p.line = r.line;
+  }
+}
+
 }  // namespace lo_ros

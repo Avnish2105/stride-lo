@@ -77,6 +77,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_conversions test/test_conversions.cpp)
   target_link_libraries(test_conversions lo_ros_common)
+  ament_add_gtest(test_black_box test/test_black_box.cpp TIMEOUT 60)
+  target_link_libraries(test_black_box lo_ros_common)
   ament_add_gtest(test_params test/test_params.cpp)
   target_link_libraries(test_params lo_ros_common)
   target_compile_definitions(test_params PRIVATE

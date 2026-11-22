@@ -76,22 +76,7 @@ public:
   void onScan(const lo::RawScan & scan, lo::TimeNs arrival, lo::TimeNs) override
   {
     livox_ros_driver2::msg::CustomMsg m;
-    m.header.stamp = lo_ros::toStamp(scan.t0);
-    m.header.frame_id = "livox_frame";
-    m.timebase = static_cast<uint64_t>(scan.t0);
-    m.point_num = static_cast<uint32_t>(scan.size);
-    m.points.resize(scan.size);
-    for (std::size_t i = 0; i < scan.size; ++i) {
-      const lo::RawPoint & r = scan.points[i];
-      auto & p = m.points[i];
-      p.x = r.x;
-      p.y = r.y;
-      p.z = r.z;
-      p.offset_time = r.offset_ns;
-      p.reflectivity = r.reflectivity;
-      p.tag = r.tag;
-      p.line = r.line;
-    }
+    lo_ros::toCustomMsg(scan, "livox_frame", m);
     w_.write(m, "/livox/lidar", rclcpp::Time(arrival, RCL_ROS_TIME));
   }
 

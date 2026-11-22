@@ -48,6 +48,9 @@ geometry_msgs::msg::Pose toPose(const lo::SE3 & T);
 /// CustomMsg -> RawPoint buffer (resized up to max_points, never beyond its capacity).
 /// Returns the scan view (t0 = timebase).
 lo::RawScan toRawScan(const livox_ros_driver2::msg::CustomMsg & msg, std::vector<lo::RawPoint> & buf);
+/// Inverse of toRawScan (synthetic sensors: lo_synth_bag, lo_sim): timebase = scan.t0.
+void toCustomMsg(const lo::RawScan & scan, const std::string & frame_id,
+  livox_ros_driver2::msg::CustomMsg & msg);
 
 lo::ImuSample toImuSample(const sensor_msgs::msg::Imu & msg);
 

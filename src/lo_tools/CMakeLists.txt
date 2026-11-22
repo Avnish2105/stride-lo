@@ -35,6 +35,7 @@ install(PROGRAMS
   scripts/bag_suite.py
   scripts/evaluate.py
   scripts/fault_inject.py
+  scripts/live_check.sh
   scripts/run_fault_suite.sh
   scripts/soak.py
   DESTINATION lib/${PROJECT_NAME})

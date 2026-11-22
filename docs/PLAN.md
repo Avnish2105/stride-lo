@@ -10,7 +10,7 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 | 0 | Context docs, Docker image, workspace, vendored small_gicp + patches, lo_msgs, skeletons, scripts | Image builds, workspace builds, unit tests run | done (CI workflows land with phase 4) |
 | 1 | Core LO: S0, S2, S5, S6, S8, lo_replay, lo_synth basics | No divergence, RPE ≤ 2% (synthetic room, outdoor_yard bags) | done (2026-11-22) |
 | 2 | Deskew + self-filter: S1, S3, S4, bias estimator, URDF kinematic model | RPE ≤ 1% on trotting bags | done (2026-11-22): all 25 bags ≤ 0.154% |
-| 3 | Integrity, covariance, LoFactor, adapter, demo graph, evaluate.py, κ/λ_min tuning | Mean NEES ∈ [4, 9], 0 false accepts | pending |
+| 3 | Integrity, covariance, LoFactor, adapter, demo graph, evaluate.py, κ/λ_min tuning | Mean NEES ∈ [4, 9], 0 false accepts | done with a recorded deviation (2026-11-22): 0 false accepts on 25 bags, mean NEES 2.2 (conservative; band not reachable together with 0 false accepts on sim data, I32) |
 | 4 | State machine, watchdogs, black box, lifecycle + supervisor, fault injector + suite, sanitizers, soak | Fault suite green, memory flat ±5% | pending |
 | 5 | lo_sim Gazebo rig + scenes, Orin tooling, TUNING.md | Full acceptance table on x86 (Orin timing reported only) | pending |
 
@@ -39,6 +39,16 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
     v3 per bag: RPE 0.085–0.154 %, availability 0.999, 0–1 rejects, 0 LOSTs; yard NEES 2.8–3.1,
     rough 2.5–4.3 (Σ conservative: κ tuning is phase 3). Timing on the x86 laptop (2 threads):
     median 10.1 ms, p99 18.5 ms (Orin to be measured).
+- **Phase 3** (2026-11-22). lo_gtsam_adapter (LoFactor → BetweenFactor<Pose3>, body-frame change,
+  ChainTracker) with GTSAM tests (marginal = Σ, Mahalanobis of the right perturbation, adjoint =
+  lo_core's), lo_graph_demo (NodeRequests every 100 ms on IMU stamps, iSAM2). Covariance:
+  weak-direction term (I31).
+  - κ sweep, 6 bags (weak term on): κ 20/8/5 → NEES 2.6/3.2/3.4, false accepts 0/3/3; half floor,
+    κ 20/10 → NEES 5.6/7.4, false accepts 20/60. Kept κ = 20 + spec floor (I32).
+  - 25-bag suite v4: RPE 0.125 %, 0.0081 deg/m, availability 0.999, **0 false accepts**, mean
+    NEES 2.22 (1.74–3.36), t_med 10.6 ms / p99 19.8 ms.
+  - Live: `live_check.sh` (ros2 bag play --clock → lifecycle node + supervisor ↔ lo_graph_demo),
+    yard 1, 60 s: RPE 0.175 %, NEES 2.29, 0 false accepts, all factors on graph nodes.
 
 ---
 

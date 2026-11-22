@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lo_gtsam_adapter</name>
+  <version>0.1.0</version>
+  <description>STRIDE LiDAR odometry GTSAM adapter: LoFactor to BetweenFactor&lt;Pose3&gt; (base or body frame), chain tracker, and lo_graph_demo (an iSAM2 backend that requests graph nodes on IMU stamps).</description>
+  <maintainer email="avnishd2105@gmail.com">avnish</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>lo_msgs</depend>
+  <depend>gtsam</depend>
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>lo_core</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

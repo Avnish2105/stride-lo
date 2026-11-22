@@ -185,6 +185,10 @@ struct Config
     double floor_rot_deg = 0.05;           ///< 1 sigma per axis
     double floor_trans = 0.005;            ///< 1 sigma per axis [m]
     double fallback_scale = 4.0;           ///< deskew fallback / IMU lost / blocked inflation
+    /// Weakly observed directions (lambda_min <= eig/N < weak_lambda): + weak_sigma^2 at
+    /// lambda_min, fading to 0 at weak_lambda (scaled units, DECISIONS I31). 0 = off.
+    double weak_lambda = 0.2;
+    double weak_sigma = 0.025;
   } cov;
 
   struct Map

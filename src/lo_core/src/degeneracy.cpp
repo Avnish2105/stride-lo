@@ -1,5 +1,6 @@
 #include "lo_core/integrity/degeneracy.hpp"
 
+#include <algorithm>
 #include <Eigen/Eigenvalues>
 
 namespace lo {
@@ -113,6 +114,20 @@ Mat6 registrationCovariance(const Mat6 & H, const DegeneracyInfo & d, double sig
     const MatX6 I = MatX6::Identity(m, m);
     const MatX6 Ainv = ldlt.solve(I);
     Ss += cfg.cov.kappa * sigma2 * (Om * Ainv * Om.transpose());
+  }
+  // weakly observed directions (lambda_min <= lambda < weak_lambda) partly keep the seed's error
+  // (correspondences slide along them): add variance growing to weak_sigma^2 at lambda_min
+  // (DECISIONS I31). Scaled units: metres, rotation at range L.
+  const double lw = cfg.cov.weak_lambda, lm = cfg.degeneracy.lambda_min;
+  if (lw > lm && cfg.cov.weak_sigma > 0.0) {
+    for (int k = 0; k < 6; ++k) {
+      if (d.degenerate[k]) {continue;}
+      const double lam = std::max(d.eigenvalues[k], lm);
+      if (lam >= lw) {continue;}
+      const double f = (lw / lam - 1.0) / (lw / lm - 1.0);
+      const Vec6 v = d.V.col(k);
+      Ss += f * cfg.cov.weak_sigma * cfg.cov.weak_sigma * v * v.transpose();
+    }
   }
   for (int k = 0; k < 6; ++k) {
     if (!d.degenerate[k]) {continue;}

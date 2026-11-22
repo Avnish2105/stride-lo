@@ -178,6 +178,10 @@ void visitParams(Config & c, Visitor & v)
   v.number("cov.floor_trans", c.cov.floor_trans, 0.0, 1.0, "Translation floor 1 sigma [m]");
   v.number("cov.fallback_scale", c.cov.fallback_scale, 1.0, 1000.0,
     "Whole-factor inflation (deskew fallback, IMU lost, blocked)");
+  v.number("cov.weak_lambda", c.cov.weak_lambda, 0.0, 10.0,
+    "Directions with eig/N below this (and above lambda_min) get extra variance");
+  v.number("cov.weak_sigma", c.cov.weak_sigma, 0.0, 1.0,
+    "Extra 1 sigma at lambda_min along weak directions (scaled units) [m]");
 
   // ---- S8 / S9 ----
   v.number("map.insert_dist", c.map.insert_dist, 0.0, 100.0, "Insert after this motion [m]");
