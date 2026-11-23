@@ -1,0 +1,56 @@
+# STRIDE robot file template. Copy it into YOUR repo, fill the REQUIRED fields, and launch with
+#   ros2 launch lo_ros stride_lo.launch.py robot:=default config:=/abs/path/my_robot.yaml
+# Load order: default.yaml -> config:= file -> launch overrides. Only values that differ from
+# the defaults belong here; every core parameter, range and default is in
+# src/lo_core/include/lo_core/config/schema.hpp. Tuning procedure: docs/TUNING.md.
+# Interface contract for your backend: docs/INTEGRATION.md.
+stride_lo:
+  ros__parameters:
+    topics:
+      lidar: /livox/lidar               # REQUIRED livox_ros_driver2/CustomMsg (xfer_format: 1)
+      imu: /livox/imu                   # REQUIRED gyro for deskew + seed (Mid-360 internal is fine)
+      joints: ""                        # sensor_msgs/JointState for the leg self-filter; "" = off
+      graph_odom: ""                    # nav_msgs/Odometry of YOUR backend (translation seed only;
+                                        # gated, never trusted, DECISIONS I26); "" = LO's own velocity
+      node_request: ""                  # set by the launch arg requests:=true, or your own topic
+      ptp_offset: ""                    # std_msgs/Float64 PTP offset [s]; "" = off
+
+    frames:
+      base: base_link                   # REQUIRED factor frame: T_ij and Sigma are expressed here
+      lidar: livox_frame                # REQUIRED frame_id of the CustomMsg points
+      imu: livox_frame                  # REQUIRED frame_id of the IMU messages
+      odom: stride_odom                 # debug odometry frame (never fuse it)
+
+    imu:
+      accel_scale: 9.80665              # 9.80665 for the Livox driver (g); 1.0 for m/s^2 IMUs
+      sample_convention: instant        # instant | interval_mean (check your driver)
+      time_offset: 0.0                  # MEASURE on the robot: lo_tools time_offset.py (TUNING.md)
+
+    scan:
+      time_quantum: 0.0                 # keep 0 on real sensors (sim-emulator calibration only)
+      time_offset: 0.0
+
+    extrinsics:
+      # tf: base->lidar and lidar->imu from /tf_static (robot_state_publisher + your URDF).
+      # params: give them here instead, [x y z qx qy qz qw].
+      source: tf                        # REQUIRED tf | params
+      # base_lidar: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]   # T_base_lidar
+      # lidar_imu:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]   # T_lidar_imu (identity for Mid-360 internal)
+
+    self_filter:
+      # Axis-aligned boxes in the base frame [xmin ymin zmin xmax ymax zmax].
+      body_box: [-0.4, -0.2, -0.15, 0.4, 0.2, 0.15]      # REQUIRED robot body (+ sensor mount)
+      leg_box: [-0.6, -0.4, -0.6, 0.6, 0.4, 0.05]        # used when no joints / URDF
+      robot_description_topic: ""       # /robot_description to filter legs by forward kinematics
+      urdf_file: ""                     # or a URDF file path (overrides the topic)
+
+    clock:
+      check_skew: true                  # keep on for real hardware
+
+    # After real bags with ground truth exist, tune per docs/TUNING.md:
+    # cov:
+    #   kappa: 20.0
+    # degeneracy:
+    #   lambda_min: ...
+    # runtime:
+    #   cpu_affinity: [4, 5]            # Orin: pin the worker away from the backend

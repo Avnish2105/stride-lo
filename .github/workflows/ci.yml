@@ -44,6 +44,8 @@ jobs:
         run: scripts/dc run --rm ci scripts/test.sh
       - name: Fault suite summary
         run: scripts/dc run --rm ci bash -c 'source install/setup.bash && lo_synth_run suite'
+      - name: Out-of-tree consumer (examples/minimal_backend against install/)
+        run: scripts/dc run --rm ci scripts/check_consumer.sh
       - name: clang-tidy
         run: scripts/dc run --rm ci scripts/tidy.sh
       - uses: actions/upload-artifact@v4

@@ -12,6 +12,7 @@ zero allocations, deterministic replay). ROS 2 Jazzy, CPU-only, Jetson Orin targ
 - Plan, status and results: [docs/PLAN.md](docs/PLAN.md)
 - How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Bringing it up on a robot: [docs/TUNING.md](docs/TUNING.md)
+- **Using it in your own stack: [docs/INTEGRATION.md](docs/INTEGRATION.md)**
 
 ## Results (GPS-denied sim bags, 25 runs, outdoor yard + rough terrain, trotting ANYmal C)
 
@@ -27,6 +28,18 @@ zero allocations, deterministic replay). ROS 2 Jazzy, CPU-only, Jetson Orin targ
 
 Evaluated against the bags' 1 kHz ground truth, with node requests at the estimator's keyframe
 times. Synthetic suite (13 scenarios incl. the 11 fault cases): 0 false accepts.
+
+## Integrating into your stack
+
+STRIDE is **not a drop-in FAST-LIO replacement**. It emits relative-pose factors for *your*
+factor-graph backend; it does not publish a fused pose (its `~/odometry` is debug only). Wiring:
+your backend publishes `lo_msgs/NodeRequest` at each node time and adds each `LoFactor` as a
+`BetweenFactor<Pose3>` via `lo_gtsam_adapter`. No backend yet: `lo_graph_demo` gives a pose.
+Start from [docs/INTEGRATION.md](docs/INTEGRATION.md), the robot file template
+[`src/lo_ros/config/robot_template.yaml`](src/lo_ros/config/robot_template.yaml) and the
+out-of-tree consumer [`examples/minimal_backend`](examples/minimal_backend)
+(`scripts/check_consumer.sh` builds and runs it against an installed stride-lo).
+Validated on simulated data only so far: real Mid-360 tuning and Orin timing are still open.
 
 ## Build and test
 
@@ -135,6 +148,7 @@ ros2 run lo_tools live_check.sh BAG live_out 60                             # li
 | `scripts/dc` | `docker compose` wrapper (host side): mounts the repo at its own path, bags from `STRIDE_BAGS_DIR` at `/data/bags` (read-only), runs as your uid. `dc build dev`, `dc run --rm dev <cmd>`. |
 | `scripts/build.sh` | colcon Release build with `-Wall -Werror`; `--sanitizer=address\|undefined\|thread` builds into `build_<san>/`; extra args go to colcon. Applies the small_gicp patches first. |
 | `scripts/test.sh` | `colcon test` + results for the Release or a sanitizer build. |
+| `scripts/check_consumer.sh [BAG]` | builds `examples/minimal_backend` in a fresh workspace against `install/` (proves the package exports); with a bag, runs it live against `stride_lo` and checks the factors. |
 | `scripts/tidy.sh` | clang-tidy over STRIDE's own C++ (needs `compile_commands.json` from a build). |
 | `scripts/patch_small_gicp.sh` | copies the pristine `src/third_party/small_gicp` to `.stride_patched/` and applies `patches/small_gicp/*.patch` (called by `build.sh`). |
 | `scripts/vendor_small_gicp.sh [tag]` | re-vendors upstream small_gicp (default `v1.0.1`). |

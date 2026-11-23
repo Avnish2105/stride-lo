@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>stride_minimal_backend</name>
+  <version>0.1.0</version>
+  <description>Example out-of-tree consumer of STRIDE LoFactors: requests graph nodes, converts factors with lo_gtsam_adapter, counts them. Template for a backend plugin in your own repo.</description>
+  <maintainer email="noreply@example.com">stride-lo</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>lo_msgs</depend>
+  <depend>lo_gtsam_adapter</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

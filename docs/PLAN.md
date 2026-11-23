@@ -13,13 +13,16 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
 | 3 | Integrity, covariance, LoFactor, adapter, demo graph, evaluate.py, κ/λ_min tuning | Mean NEES ∈ [4, 9], 0 false accepts | done with a recorded deviation (2026-11-22): 0 false accepts on 25 bags, mean NEES 2.2 (conservative; band not reachable together with 0 false accepts on sim data, I32) |
 | 4 | State machine, watchdogs, black box, lifecycle + supervisor, fault injector + suite, sanitizers, soak | Fault suite green, memory flat ±5% | done (2026-11-22): synthetic + bag fault suites 0 false accepts (I35), ASan/UBSan/TSan green on CI, 8 h soak RSS flat (0.00 %) |
 | 5 | lo_sim Gazebo rig + scenes, Orin tooling, TUNING.md | Full acceptance table on x86 (Orin timing reported only) | done on x86 (2026-11-22); Orin timing left for the robot |
+| I | Integration readiness: INTEGRATION.md, robot template, out-of-tree consumer + CI check | External workspace builds against `install/` and consumes live factors | done (2026-11-23): `check_consumer.sh` PASS (yard 1, 40 s: 262 factors, 0 unmatched / rejected / chain breaks) |
 
 ## Remaining (needs the robot / Orin)
 
 1. Orin timing (median ≤ 25 ms, p99 ≤ 50 ms; x86 laptop: 10.3 / 19.0 ms), `orin_setup.sh`.
 2. Real Mid-360 bags with ground truth: `time_offset.py` for `imu.time_offset` (the sim value
    −2.25 ms is the emulated driver latency, I34), then κ / floor / λ_min per TUNING.md (I32).
-3. PR #1 `feat/stride-lo` → `main` opened 2026-11-23 (https://github.com/Avnish2105/stride-lo/pull/1); merge is the owner's call.
+3. Integration into a real backend (e.g. `factor_graph_estimator`) is done in that repo by its
+   owner, against [INTEGRATION.md](INTEGRATION.md); STRIDE is not a FAST-LIO drop-in (I40).
+4. PR #1 `feat/stride-lo` → `main` opened 2026-11-23 (https://github.com/Avnish2105/stride-lo/pull/1); merge is the owner's call.
 
 ## Results log
 
@@ -80,6 +83,15 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
     availability 0.999; timing not comparable, run under load). Synthetic + fault suites:
     0 false accepts. 62 tests green.
   - `lo_graph_demo` no longer dies on an ill-posed new chain (I39).
+- **Integration readiness** (2026-11-23). `docs/INTEGRATION.md` (inputs, outputs, LoFactor
+  semantics, emit modes, GTSAM recipe, FAST-LIO migration, new-robot checklist, validation
+  status), `config/robot_template.yaml` (loads from any path with `config:=`; with no TF it stops
+  at configure with an actionable extrinsics message), `examples/minimal_backend` built out of tree
+  on the `install/` underlay by `scripts/check_consumer.sh` (also a CI step). Export gap fixed:
+  `lo_gtsam_adapter` declared `lo_core` only as a test dependency though its CMake needs it.
+  Live, yard 1, 40 s, request mode: 262 factors accepted, 0 unmatched, 0 non-SPD, 0 chain breaks.
+  New test: all shipped params files (incl. the template) validate with no unknown keys.
+  63 tests green. No lo_core change: replay output unchanged.
 
 ---
 
