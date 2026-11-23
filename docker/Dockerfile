@@ -108,6 +108,7 @@ ARG USER_GID=1000
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-rviz2 \
         sudo less vim-tiny bash-completion htop valgrind \
+        xvfb x11vnc novnc python3-websockify x11-utils imagemagick xdotool fluxbox \
     && rm -rf /var/lib/apt/lists/*
 # Ubuntu 24.04 images ship a user `ubuntu` with uid 1000: replace it with `dev`, so files
 # created in the bind-mounted workspace belong to the host user (no root-owned build/).

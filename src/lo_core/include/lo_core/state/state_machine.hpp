@@ -88,6 +88,8 @@ public:
   std::uint64_t losts() const {return losts_;}
   std::uint64_t recoveries() const {return recoveries_;}
   std::uint64_t chainBreaks() const {return chain_breaks_;}
+  /// A chain break without a state change (long-gap recovery, DECISIONS I38).
+  void noteChainBreak() {++chain_breaks_;}
 
 private:
   int max_rejects_;

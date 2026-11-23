@@ -13,6 +13,10 @@ namespace lo_sim {
 /// /robot_description: the STRIDE node's leg self-filter is built from it.
 std::string rigUrdf(const lo::synth::Scenario & sc, const lo::synth::SyntheticRobot & robot);
 
+/// rigUrdf with visual geometry (body box, leg segments, feet, Mid-360 puck), for RViz only.
+/// Kept separate so the self-filter's /robot_description input never changes.
+std::string rigVizUrdf(const lo::synth::Scenario & sc, const lo::synth::SyntheticRobot & robot);
+
 /// Gazebo world (SDF 1.9) with the scenario's static primitives, one model per walker
 /// (walker_<i>), the rig model `stride_rig` and the lo_sim KinematicRig system plugin that moves
 /// them along the scenario trajectories.

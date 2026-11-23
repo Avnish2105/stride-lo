@@ -57,6 +57,7 @@ else()
   message(WARNING "lo_sim: gz-sim not found, Gazebo plugin skipped (lo_sim_rig still works)")
 endif()
 
-install(DIRECTORY launch rviz DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/lo_viz.py DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY launch rviz config DESTINATION share/${PROJECT_NAME})
 ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/lo_sim.dsv.in")
 ament_package()

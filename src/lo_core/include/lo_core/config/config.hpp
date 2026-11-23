@@ -219,6 +219,9 @@ struct Config
     double timeout = 2.0;                  ///< then reset map + new chain [s]
     double gate = 4.0;                     ///< wide gate of the recovery coarse match [m]
     int coarse_iters = 10;
+    /// A recovery after a longer gap since the last accepted scan starts a new chain: the
+    /// wide-gate match is not trusted to bridge it (DECISIONS I38) [s]
+    double max_bridge = 2.0;
   } recovery;
 
   struct Degraded

@@ -27,7 +27,8 @@ __pycache__/
 *.pcd
 
 # Editors / OS
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 *.swp
 .DS_Store
@@ -44,3 +45,4 @@ log_*/
 .stride_patched/
 compile_commands.json
 .claude/
+sim_*_20[0-9][0-9]*/

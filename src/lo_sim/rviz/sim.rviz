@@ -1,18 +1,113 @@
 Panels:
   - Class: rviz_common/Displays
     Name: Displays
+    Help Height: 0
+    Tree Height: 420
+    Property Tree Widget:
+      Splitter Ratio: 0.85
 Visualization Manager:
+  Class: ""
   Global Options:
-    Fixed Frame: stride_odom
+    Fixed Frame: world
+    Background Color: 30; 32; 36
+    Frame Rate: 30
   Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid (1 m)
+      Enabled: true
+      Reference Frame: world
+      Cell Size: 1
+      Plane Cell Count: 60
+      Color: 90; 90; 95
+      Alpha: 0.5
     - Class: rviz_default_plugins/PointCloud2
-      Name: local map
-      Topic: {Value: /stride_lo/local_map}
-      Size (m): 0.03
-    - Class: rviz_default_plugins/Odometry
-      Name: STRIDE odometry
-      Topic: {Value: /stride_lo/odometry}
-      Keep: 200
+      Name: "Map: STRIDE local map (colour = height)"
+      Enabled: true
+      Topic:
+        Value: /stride_lo/local_map
+        Depth: 1
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 2
+      Color Transformer: AxisColor
+      Axis: Z
+      Use Fixed Frame: true
+      Autocompute Value Bounds: false
+      Min Value: -0.2
+      Max Value: 3
+      Alpha: 0.8
+    - Class: rviz_default_plugins/PointCloud2
+      Name: "Scan: current deskewed scan (white)"
+      Enabled: true
+      Topic:
+        Value: /stride_lo/deskewed
+        Depth: 2
+        Durability Policy: Volatile
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 3
+      Color Transformer: FlatColor
+      Color: 255; 255; 255
+      Alpha: 1
+    - Class: rviz_default_plugins/RobotModel
+      Name: "Robot: where STRIDE thinks it is"
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /lo_viz/robot_description
+        Durability Policy: Transient Local
+      Alpha: 1
     - Class: rviz_default_plugins/Path
-      Name: graph path
-      Topic: {Value: /lo_graph_demo/path}
+      Name: "Path: ground truth (green)"
+      Enabled: true
+      Topic:
+        Value: /lo_viz/gt_path
+        Durability Policy: Transient Local
+      Color: 60; 220; 90
+      Line Style: Billboards
+      Line Width: 0.06
+      Alpha: 1
+    - Class: rviz_default_plugins/Path
+      Name: "Path: STRIDE LiDAR odometry (orange)"
+      Enabled: true
+      Topic:
+        Value: /lo_viz/lo_path
+        Durability Policy: Transient Local
+      Color: 255; 150; 30
+      Line Style: Billboards
+      Line Width: 0.04
+      Alpha: 1
+    - Class: rviz_default_plugins/Path
+      Name: "Path: GTSAM graph from STRIDE factors (blue)"
+      Enabled: true
+      Topic:
+        Value: /lo_graph_demo/path
+      Color: 70; 140; 255
+      Line Style: Billboards
+      Line Width: 0.03
+      Alpha: 1
+    - Class: rviz_default_plugins/Marker
+      Name: "Status: STRIDE state, health, error vs ground truth"
+      Enabled: true
+      Topic:
+        Value: /lo_viz/status
+    - Class: rviz_default_plugins/TF
+      Name: TF frames
+      Enabled: false
+  Views:
+    Current:
+      Class: rviz_default_plugins/ThirdPersonFollower
+      Target Frame: base
+      Distance: 14
+      Pitch: 0.75
+      Yaw: 3.6
+      Focal Point: {X: 0, Y: 0, Z: 0}
+      Near Clip Distance: 0.05
+Window Geometry:
+  Width: 960
+  Height: 1050
+  Displays:
+    collapsed: false

@@ -16,3 +16,9 @@ stride_lo:
       robot_description_topic: /robot_description
     extrinsics:
       source: tf
+    clock:
+      # lo_sim's arrival-based skew proxy also sees the rig's own release timing and DDS delivery
+      # on a loaded host: up to 3 ms with the Gazebo + RViz GUIs in software GL (crowd, after the
+      # rig's look-ahead release; 20-69 ms before it). 2 ms would fire on that. Keep the check
+      # (off, a 50 ms LiDAR offset gave 38 false accepts) with margin above it (DECISIONS I37).
+      max_skew: 0.015

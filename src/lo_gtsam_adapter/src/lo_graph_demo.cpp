@@ -6,6 +6,10 @@
 //    (iSAM2); a new chain gets a weak prior at the current estimate (there is no IMU factor here
 //    to bridge chain breaks, unlike the real estimator);
 //  * publishes ~/path (all node estimates) and ~/pose (latest node with marginal covariance).
+//  * a solver failure (ill-posed system, e.g. a weakly anchored new chain whose first factor is
+//    DEGRADED) never takes the node down: the graph restarts at the last estimate and the path
+//    drawn so far is kept.
+#include <exception>
 #include <map>
 #include <memory>
 #include <string>
@@ -133,7 +137,9 @@ private:
       // first node of the graph (origin) or of a new chain (weak prior at the last estimate)
       const bool origin = !have_last_;
       const gtsam::Pose3 Ti = origin ? gtsam::Pose3() : last_pose_;
-      const double s_rot = origin ? 1e-6 : 10.0, s_pos = origin ? 1e-6 : 1e3;
+      // weak, but well-posed: a new chain's unseen (DEGRADED, inflated) directions must not
+      // make the system indeterminate
+      const double s_rot = origin ? 1e-6 : 0.5, s_pos = origin ? 1e-6 : 10.0;
       graph.add(gtsam::PriorFactor<gtsam::Pose3>(*ki, Ti, gtsam::noiseModel::Diagonal::Sigmas(
           (gtsam::Vector6() << s_rot, s_rot, s_rot, s_pos, s_pos, s_pos).finished())));
       values.insert(*ki, Ti);
@@ -149,8 +155,15 @@ private:
       estimate_.insert(*kj, Tj);
     }
     graph.add(*between);
-    isam_->update(graph, values);
-    estimate_ = isam_->calculateEstimate();
+    gtsam::Matrix6 C;
+    try {
+      isam_->update(graph, values);
+      estimate_ = isam_->calculateEstimate();
+      C = isam_->marginalCovariance(*kj);   // [rx ry rz tx ty tz] local
+    } catch (const std::exception & e) {
+      restart(e.what());
+      return;
+    }
     last_pose_ = estimate_.at<gtsam::Pose3>(*kj);
     have_last_ = true;
     ++factors_;
@@ -160,7 +173,6 @@ private:
     out.header.stamp = f.stamp_j;
     out.header.frame_id = frame_;
     out.pose.pose = toPose(last_pose_);
-    const gtsam::Matrix6 C = isam_->marginalCovariance(*kj);   // [rx ry rz tx ty tz] local
     for (int r = 0; r < 6; ++r) {
       for (int c = 0; c < 6; ++c) {
         // ROS PoseWithCovariance order is [x y z rx ry rz]
@@ -170,12 +182,36 @@ private:
     pose_pub_->publish(out);
   }
 
+  /// Solver failure: keep the path so far, start a fresh graph at the last estimate.
+  void restart(const char * what)
+  {
+    ++restarts_;
+    for (const auto & [t, key] : keys_by_time_) {
+      if (estimate_.exists(key)) {frozen_[t] = estimate_.at<gtsam::Pose3>(key);}
+    }
+    keys_by_time_.clear();
+    estimate_.clear();
+    gtsam::ISAM2Params params = isam_->params();
+    isam_ = std::make_unique<gtsam::ISAM2>(params);
+    std::string msg(what);
+    msg = msg.substr(0, msg.find('\n', 1));
+    RCLCPP_WARN(get_logger(), "solver failure (%s): graph restarted at the last estimate", msg.c_str());
+  }
+
   void publishPath()
   {
-    if (keys_by_time_.empty()) {return;}
+    if (keys_by_time_.empty() && frozen_.empty()) {return;}
     nav_msgs::msg::Path path;
-    path.header.stamp = toStamp(keys_by_time_.rbegin()->first);
+    path.header.stamp = toStamp(keys_by_time_.empty() ? frozen_.rbegin()->first :
+      keys_by_time_.rbegin()->first);
     path.header.frame_id = frame_;
+    for (const auto & [t, T] : frozen_) {
+      geometry_msgs::msg::PoseStamped ps;
+      ps.header.stamp = toStamp(t);
+      ps.header.frame_id = frame_;
+      ps.pose = toPose(T);
+      path.poses.push_back(ps);
+    }
     for (const auto & [t, key] : keys_by_time_) {
       if (!estimate_.exists(key)) {continue;}
       geometry_msgs::msg::PoseStamped ps;
@@ -186,9 +222,10 @@ private:
     }
     path_pub_->publish(path);
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 10000,
-      "graph: %lu factors, %lu unmatched, %lu dropped, %lu chain breaks",
+      "graph: %lu factors, %lu unmatched, %lu dropped, %lu chain breaks, %lu restarts",
       static_cast<unsigned long>(factors_), static_cast<unsigned long>(unmatched_),
-      static_cast<unsigned long>(dropped_), static_cast<unsigned long>(tracker_.breaks()));
+      static_cast<unsigned long>(dropped_), static_cast<unsigned long>(tracker_.breaks()),
+      static_cast<unsigned long>(restarts_));
   }
 
   std::int64_t node_period_ns_{100000000}, match_tol_ns_{1000000}, next_node_ns_{0};
@@ -196,13 +233,14 @@ private:
   bool accept_low_confidence_{true};
   std::map<std::int64_t, std::uint64_t> nodes_;       ///< published node time -> index
   std::map<std::int64_t, gtsam::Key> keys_by_time_;   ///< nodes in the graph
+  std::map<std::int64_t, gtsam::Pose3> frozen_;       ///< path before a solver restart
   std::uint64_t next_key_{0};
   std::unique_ptr<gtsam::ISAM2> isam_;
   gtsam::Values estimate_;
   gtsam::Pose3 last_pose_;
   bool have_last_{false};
   lo_gtsam::ChainTracker tracker_;
-  std::uint64_t factors_{0}, unmatched_{0}, dropped_{0};
+  std::uint64_t factors_{0}, unmatched_{0}, dropped_{0}, restarts_{0};
   rclcpp::Publisher<lo_msgs::msg::NodeRequest>::SharedPtr request_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;

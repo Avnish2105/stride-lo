@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <sstream>
 
 namespace lo_sim {
@@ -54,6 +55,47 @@ std::string rigUrdf(const lo::synth::Scenario & sc, const lo::synth::SyntheticRo
     << "    <parent link=\"base\"/>\n    <child link=\"livox_frame\"/>\n    "
     << origin(sc.T_base_lidar) << "\n  </joint>\n</robot>\n";
   return u.str();
+}
+
+std::string rigVizUrdf(const lo::synth::Scenario & sc, const lo::synth::SyntheticRobot & robot)
+{
+  // Same links and joints as rigUrdf, plus visuals: each joint offset is drawn as a cylinder on
+  // its parent link (the leg segments), the body as a box, feet as spheres, the Mid-360 as a puck.
+  std::map<std::string, std::string> visuals;
+  const auto segment = [](const lo::Vec3 & v, const char * material) {
+      std::ostringstream o;
+      const double len = v.norm();
+      if (len < 1e-3) {return o.str();}
+      const Eigen::Quaterniond q = Eigen::Quaterniond::FromTwoVectors(lo::Vec3::UnitZ(), v);
+      o << "    <visual>" << origin(lo::SE3(lo::SO3(q), 0.5 * v)) << "<geometry><cylinder radius=\"0.035\" "
+        << "length=\"" << len << "\"/></geometry><material name=\"" << material << "\"/></visual>\n";
+      return o.str();
+    };
+  visuals["base"] = "    <visual><geometry><box size=\"0.8 0.4 0.25\"/></geometry>"
+    "<material name=\"body\"/></visual>\n";
+  for (const lo::KinJointSpec & j : robot.joints()) {
+    if (j.parent_link != "base") {visuals[j.parent_link] += segment(j.origin.translation(), "leg");}
+    if (j.type == lo::JointType::FIXED) {
+      visuals[j.child_link] += "    <visual><geometry><sphere radius=\"0.04\"/></geometry>"
+        "<material name=\"foot\"/></visual>\n";
+    }
+  }
+  visuals["livox_frame"] = "    <visual><geometry><cylinder radius=\"0.05\" length=\"0.065\"/>"
+    "</geometry><material name=\"lidar\"/></visual>\n";
+  std::string xml = rigUrdf(sc, robot);
+  const std::string materials =
+    "  <material name=\"body\"><color rgba=\"0.95 0.6 0.1 1\"/></material>\n"
+    "  <material name=\"leg\"><color rgba=\"0.25 0.25 0.28 1\"/></material>\n"
+    "  <material name=\"foot\"><color rgba=\"0.1 0.1 0.1 1\"/></material>\n"
+    "  <material name=\"lidar\"><color rgba=\"0.1 0.7 0.9 1\"/></material>\n";
+  xml.insert(xml.find('\n', xml.find("<robot")) + 1, materials);
+  for (const auto & [link, v] : visuals) {
+    const std::string tag = "<link name=\"" + link + "\"/>";
+    const std::size_t at = xml.find(tag);
+    if (at == std::string::npos) {continue;}
+    xml.replace(at, tag.size(), "<link name=\"" + link + "\">\n" + v + "  </link>");
+  }
+  return xml;
 }
 
 std::string worldSdf(const std::string & scenario, std::uint64_t seed, const lo::synth::Scenario & sc)

@@ -508,8 +508,16 @@ void Pipeline::handleTracking(
 
   // ---------------- accepted (ACCEPT / DEGRADED)
   if (recovering) {
+    // Found again after a long gap: the wide-gate match may lock onto a similar-looking place
+    // (seed error grows with the gap; 6.7 m along a degenerate axis after an 11 s clock fault,
+    // measured). Keep tracking, but do not bridge the gap with a factor (DECISIONS I38).
+    const bool long_gap = has_prev_ && t_ref - t_prev_ > fromSec(cfg_.recovery.max_bridge);
     sm_.toTracking(t_ref);
     emitter_.noteRecovery();
+    if (long_gap) {
+      sm_.noteChainBreak();
+      startChain(t_ref);
+    }
   }
   const SE3 T = a.T;
   map_.touch(cloud_, T, t_ref);

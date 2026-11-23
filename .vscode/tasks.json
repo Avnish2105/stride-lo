@@ -1,0 +1,50 @@
+{
+  // STRIDE buttons (status bar via the "Task Buttons" extension, also Terminal -> Run Task).
+  // All run inside the dev container; Gazebo / RViz / the launcher window appear on the shared
+  // screen (scripts/screen), opened in your browser at http://localhost:6080.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "STRIDE: Launch",
+      "detail": "Shared screen + launcher window (pick sim or bag, Gazebo, RViz, then Launch)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/launcher",
+      "problemMatcher": [],
+      "presentation": {"reveal": "silent", "panel": "dedicated", "clear": true}
+    },
+    {
+      "label": "STRIDE: Build",
+      "detail": "Release build of the workspace (scripts/build.sh)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/build.sh",
+      "group": {"kind": "build", "isDefault": true},
+      "problemMatcher": ["$gcc"],
+      "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+    },
+    {
+      "label": "STRIDE: Test",
+      "detail": "All tests (scripts/test.sh)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/test.sh",
+      "group": {"kind": "test", "isDefault": true},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+    },
+    {
+      "label": "STRIDE: Screen",
+      "detail": "Open the shared Gazebo / RViz screen in the browser",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/screen start && \"$BROWSER\" \"$(${workspaceFolder}/scripts/screen url)\"",
+      "problemMatcher": [],
+      "presentation": {"reveal": "silent", "panel": "dedicated", "clear": true}
+    },
+    {
+      "label": "STRIDE: Stop",
+      "detail": "Stop the running launch (Gazebo, RViz, STRIDE); the screen stays up",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/stop_all.sh",
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+    }
+  ]
+}

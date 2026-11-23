@@ -1,0 +1,30 @@
+# Workspace defaults for colcon (colcon-defaults reads ./colcon_defaults.yaml when colcon runs
+# from the repo root). scripts/build.sh and scripts/test.sh rely on this file, and a bare
+# `colcon build --packages-select lo_core` gets the *same* CMake arguments, so it never
+# triggers a reconfigure + full rebuild of the package by accident.
+#
+# Sanitizer builds (scripts/build.sh --sanitizer=...) override build-base / install-base /
+# cmake-args on the command line; everything else comes from here.
+#
+# Parallelism: 2 packages at a time x CMAKE_BUILD_PARALLEL_LEVEL (= BUILD_JOBS, default 3)
+# compile jobs each, so at most 6 compilers. Keep it there on the 14 GB laptop (GTSAM TUs).
+build:
+  base-paths: [src, .stride_patched]
+  symlink-install: true
+  parallel-workers: 2
+  # Quiet on success (status line + summary), compiler errors/warnings still shown in full.
+  # Full per-package output stays in log/latest_build/<pkg>/stdout_stderr.log.
+  event-handlers: [console_stderr+, console_cohesion-, summary+, status-]
+  cmake-args:
+    - -GNinja
+    - -DCMAKE_BUILD_TYPE=Release
+    - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - -DSTRIDE_SANITIZER=
+    - -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    - -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+test:
+  base-paths: [src, .stride_patched]
+  packages-skip: [small_gicp]
+  parallel-workers: 2
+  event-handlers: [console_stderr+, console_cohesion-, summary+, status-]
+  return-code-on-test-failure: true

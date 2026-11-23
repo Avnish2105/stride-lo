@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# The shared STRIDE screen: a virtual display (Xvfb :99) in the dev container that Gazebo and
+# RViz draw on. You watch / use it in a browser (noVNC, port 6080, forwarded by VS Code); Claude
+# takes screenshots of the same display. Nothing touches your real desktop.
+#
+#   scripts/screen start              start (idempotent), print the URL
+#   scripts/screen stop | status
+#   scripts/screen url | display
+#   scripts/screen shot [all|rviz|gazebo|launcher] [out.png]   -> data/screen/shots/
+set -uo pipefail
+ws="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+dir="$ws/data/screen"
+mkdir -p "$dir/shots"
+D="${STRIDE_SCREEN_DISPLAY:-:99}"
+PORT="${STRIDE_SCREEN_PORT:-6080}"
+VNC=5999
+GEOM="${STRIDE_SCREEN_SIZE:-1920x1080}"
+URL="http://localhost:$PORT/vnc.html?autoconnect=1&resize=scale&reconnect=1"
+
+alive() { [[ -f "$dir/$1.pid" ]] && kill -0 "$(cat "$dir/$1.pid")" 2>/dev/null; }
+spawn() {  # name cmd...
+  local n=$1; shift
+  alive "$n" && return 0
+  env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 setsid "$@" >"$dir/$n.log" 2>&1 < /dev/null &
+  echo $! >"$dir/$n.pid"
+}
+wait_x() { for _ in $(seq 50); do DISPLAY=$D xdpyinfo >/dev/null 2>&1 && return 0; sleep 0.1; done; return 1; }
+
+# Window manager: no wallpaper, one workspace; RViz tiled left, Gazebo right, launcher centred
+# (you can still move / resize them in the browser).
+wm_config() {
+  local f="$dir/fluxbox" w=${GEOM%x*} h=${GEOM#*x}
+  local half=$((w / 2)) hh=$((h - 26))
+  mkdir -p "$f"
+  printf 'background: none\n' >"$f/overlay"
+  cat >"$f/init" <<EOF
+session.appsFile: $f/apps
+session.styleOverlay: $f/overlay
+session.screen0.rootCommand:
+session.screen0.workspaces: 1
+session.screen0.toolbar.widthPercent: 100
+session.screen0.toolbar.placement: BottomCenter
+session.screen0.defaultDeco: NORMAL
+EOF
+  cat >"$f/apps" <<EOF
+[app] (name=rviz2)
+  [Position] (UPPERLEFT) {0 0}
+  [Dimensions] {$half $hh}
+[end]
+[app] (name=gz-sim-gui)
+  [Position] (UPPERLEFT) {$half 0}
+  [Dimensions] {$half $hh}
+[end]
+[app] (title=STRIDE LO launcher)
+  [Position] (CENTER) {0 0}
+[end]
+EOF
+}
+
+start() {
+  for t in Xvfb x11vnc websockify fluxbox xdpyinfo; do
+    command -v $t >/dev/null || { echo "screen: '$t' missing - rebuild the dev container (docker/Dockerfile)"; exit 1; }
+  done
+  if ! alive xvfb; then
+    rm -f "/tmp/.X${D#:}-lock" "/tmp/.X11-unix/X${D#:}"
+    spawn xvfb Xvfb "$D" -screen 0 "${GEOM}x24" -nolisten tcp +extension GLX +render -noreset
+  fi
+  wait_x || { echo "screen: Xvfb did not start (see $dir/xvfb.log)"; exit 1; }
+  wm_config
+  DISPLAY=$D xsetroot -solid '#2b2b2b' 2>/dev/null
+  DISPLAY=$D spawn wm fluxbox -rc "$dir/fluxbox/init"
+  spawn vnc x11vnc -display "$D" -rfbport $VNC -localhost -forever -shared -nopw -quiet -noxdamage
+  spawn web websockify --web /usr/share/novnc "$PORT" "localhost:$VNC"
+  sleep 0.5
+  echo "STRIDE screen on DISPLAY=$D - open $URL"
+}
+
+stop() {
+  for n in web vnc wm xvfb; do
+    alive "$n" && kill "$(cat "$dir/$n.pid")" 2>/dev/null
+    rm -f "$dir/$n.pid"
+  done
+  echo "STRIDE screen stopped"
+}
+
+status() {
+  for n in xvfb wm vnc web; do printf '%-6s %s\n' "$n" "$(alive $n && echo running || echo stopped)"; done
+  alive xvfb && echo "DISPLAY=$D  $URL"
+}
+
+shot() {
+  local what=${1:-all} out=${2:-}
+  alive xvfb || { echo "screen: not running"; exit 1; }
+  [[ -n "$out" ]] || out="$dir/shots/${what}_$(date +%H%M%S).png"
+  local id=root pat=
+  case "$what" in
+    all) ;;
+    rviz) pat='RViz|rviz' ;;
+    gazebo) pat='Gazebo' ;;
+    launcher) pat='STRIDE LO launcher' ;;
+    *) pat="$what" ;;
+  esac
+  if [[ -n "$pat" ]]; then
+    id="$(DISPLAY=$D xdotool search --onlyvisible --name "$pat" 2>/dev/null | tail -1)"
+    [[ -n "$id" ]] || { echo "screen: no window matching '$pat'"; exit 1; }
+  fi
+  DISPLAY=$D import -window "$id" "$out" && echo "$out"
+}
+
+case "${1:-start}" in
+  start) start ;;
+  stop) stop ;;
+  status) status ;;
+  url) echo "$URL" ;;
+  display) echo "$D" ;;
+  shot) shift; shot "$@" ;;
+  *) sed -n 2,9p "$0"; exit 2 ;;
+esac

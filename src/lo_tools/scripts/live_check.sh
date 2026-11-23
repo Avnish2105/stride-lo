@@ -21,7 +21,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ros2 launch lo_ros stride_lo.launch.py robot:="$robot" use_sim_time:=true requests:=true \
+ros2 launch lo_ros stride_lo.launch.py robot:="$robot" use_sim_time:=true requests:=true rviz:=false \
   > "${out}.launch.log" 2>&1 &
 pids+=($!)
 ros2 run lo_gtsam_adapter lo_graph_demo --ros-args -p use_sim_time:=true -p imu_topic:=/imu/data \
