@@ -10,7 +10,7 @@ machine, "where to change X"). The other docs are long: open only what the task 
 `grep -n` for the section or I-number instead of reading them whole.
 - [docs/DESIGN.md](docs/DESIGN.md): the spec (transcribed from `docs/design/*.pdf`; don't open the PDF).
 - [docs/DECISIONS.md](docs/DECISIONS.md): the resolved open points D1–D8 and implementation interpretations I1–I40, one table row each.
-- [docs/PLAN.md](docs/PLAN.md): status table + results log on top; below "# Approved plan" is history.
+- [docs/PLAN.md](docs/PLAN.md): status table, remaining work, results log (the original plan: `docs/history/`).
 - [docs/INTEGRATION.md](docs/INTEGRATION.md), [docs/TUNING.md](docs/TUNING.md), [docs/SMALL_GICP.md](docs/SMALL_GICP.md).
 
 ## Hard rules (from the spec — never trade these away)
