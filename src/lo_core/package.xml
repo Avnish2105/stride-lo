@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lo_core</name>
+  <version>0.1.0</version>
+  <description>STRIDE LiDAR odometry core: ROS-free C++17 pipeline (validation, self-filter, deskew, GICP, integrity, covariance, state machine, emission). Dependencies: Eigen, Sophus, small_gicp, OpenMP.</description>
+  <maintainer email="avnishd2105@gmail.com">avnish</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <depend>eigen</depend>
+  <depend>small_gicp</depend>
+  <!-- Sophus 1.22.10: installed from source in docker/Dockerfile (/usr/local). -->
+
+  <test_depend>gtest</test_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

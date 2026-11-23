@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lo_synth</name>
+  <version>0.1.0</version>
+  <description>STRIDE synthetic sensor simulator (ROS-free): primitive scenes with analytic ray casting, Mid-360-like pattern with true per-point motion, IMU/joint synthesis, the fault-injection scenarios, metrics and the synthetic fault suite.</description>
+  <maintainer email="avnishd2105@gmail.com">avnish</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <depend>lo_core</depend>
+  <test_depend>gtest</test_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

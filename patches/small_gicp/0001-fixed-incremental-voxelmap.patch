@@ -1,0 +1,390 @@
+--- a/src/third_party/small_gicp/include/small_gicp/ann/fixed_incremental_voxelmap.hpp	1970-01-01 05:30:00.000000000 +0530
++++ b/src/third_party/small_gicp/include/small_gicp/ann/fixed_incremental_voxelmap.hpp	1970-01-01 05:30:00.000000000 +0530
+@@ -0,0 +1,387 @@
++// SPDX-FileCopyrightText: Copyright 2024 Kenji Koide, 2026 STRIDE authors
++// SPDX-License-Identifier: MIT
++//
++// STRIDE patch 0001 (patches/small_gicp/0001-fixed-incremental-voxelmap.patch).
++//
++// FixedIncrementalVoxelMap: the same role as IncrementalVoxelMap, built for a hard real-time
++// loop:
++//   * all memory is allocated in the constructor (voxel pool, open-addressing hash table,
++//     scratch arrays); insert / search / removal never allocate,
++//   * voxels carry the time stamp of the last insert that touched them; stale voxels (older than
++//     a caller-given time) and voxels outside a radius are removed explicitly,
++//   * when the pool is full, the least recently hit voxels are evicted (oldest first, ties by
++//     index), never at random,
++//   * voxels live in a dense array [0, size()) whose order depends only on the sequence of
++//     inserts/removals, so iteration (and therefore every result computed from it) is
++//     deterministic,
++//   * only voxels touched by an insert are re-finalized (upstream re-finalizes all voxels).
++//
++// VoxelContents follows the upstream voxel concept (default constructible, add(), finalize(),
++// Traits<VoxelContents> with size/point/cov/knn_search).
++#pragma once
++
++#include <algorithm>
++#include <cstdint>
++#include <limits>
++#include <utility>
++#include <vector>
++
++#include <Eigen/Core>
++#include <Eigen/Geometry>
++
++#include <small_gicp/ann/knn_result.hpp>
++#include <small_gicp/ann/traits.hpp>
++#include <small_gicp/points/traits.hpp>
++#include <small_gicp/util/fast_floor.hpp>
++
++#define SMALL_GICP_STRIDE_FIXED_VOXELMAP 1
++
++namespace small_gicp {
++
++/// @brief Bookkeeping of one voxel of a FixedIncrementalVoxelMap.
++struct FixedVoxelInfo {
++  Eigen::Vector3i coord = Eigen::Vector3i::Zero();  ///< Integer voxel coordinate
++  std::int64_t last_hit = 0;                        ///< Stamp of the last insert touching it
++};
++
++/// @brief Fixed-capacity, allocation-free incremental voxel map (see file header).
++template <typename VoxelContents>
++struct FixedIncrementalVoxelMap {
++public:
++  static_assert(sizeof(size_t) == 8, "size_t must be 64-bit");
++  static constexpr int point_id_bits = 32;  ///< Low bits of a global index: point in voxel
++
++  /// @param leaf_size  Voxel edge length
++  /// @param capacity   Maximum number of voxels (memory is allocated here, once)
++  FixedIncrementalVoxelMap(double leaf_size, size_t capacity)
++  : capacity_(std::max<size_t>(capacity, 1)),
++    size_(0),
++    inv_leaf_size_(1.0 / leaf_size),
++    leaf_size_(leaf_size) {
++    size_t table_size = 1;
++    while (table_size < 2 * capacity_) {
++      table_size <<= 1;
++    }
++    table_mask_ = table_size - 1;
++    table_.assign(table_size, -1);
++    infos.resize(capacity_);
++    voxels.resize(capacity_);
++    dirty_.resize(capacity_);
++    flags_.assign(capacity_, 0);
++    lru_scratch_.resize(capacity_);
++    set_search_offsets(1);
++  }
++
++  size_t size() const { return size_; }          ///< Number of voxels
++  size_t capacity() const { return capacity_; }  ///< Maximum number of voxels
++  double leaf_size() const { return leaf_size_; }
++
++  /// @brief Remove every voxel (keeps the memory).
++  void clear() {
++    std::fill(table_.begin(), table_.end(), -1);
++    size_ = 0;
++  }
++
++  /// @brief Remove every voxel and change the voxel size.
++  void reset(double leaf_size) {
++    clear();
++    leaf_size_ = leaf_size;
++    inv_leaf_size_ = 1.0 / leaf_size;
++  }
++
++  /// @brief Integer voxel coordinate of a point.
++  Eigen::Vector3i coord_of(const Eigen::Vector4d& pt) const { return fast_floor(pt * inv_leaf_size_).template head<3>(); }
++
++  /// @brief Dense index of the voxel at `coord`, or -1.
++  std::int64_t find(const Eigen::Vector3i& coord) const {
++    size_t slot = hash(coord) & table_mask_;
++    while (true) {
++      const std::int32_t idx = table_[slot];
++      if (idx < 0) {
++        return -1;
++      }
++      if (infos[idx].coord == coord) {
++        return idx;
++      }
++      slot = (slot + 1) & table_mask_;
++    }
++  }
++
++  /// @brief Insert points (transformed by T) at time `stamp`.
++  /// @return Number of points dropped because the pool was full and nothing could be evicted.
++  template <typename PointCloud>
++  size_t insert(const PointCloud& points, const Eigen::Isometry3d& T, std::int64_t stamp) {
++    const size_t n = traits::size(points);
++    if (size_ + n > capacity_) {
++      // Each point creates at most one voxel: make room up front (plus 10% slack) so that no
++      // eviction happens mid-insert (which would invalidate dense indices).
++      const size_t need = size_ + n - capacity_ + capacity_ / 10;
++      evict_lru(std::min(need, size_));
++    }
++
++    size_t num_dirty = 0;
++    size_t dropped = 0;
++    for (size_t i = 0; i < n; i++) {
++      const Eigen::Vector4d pt = T * traits::point(points, i);
++      const Eigen::Vector3i coord = coord_of(pt);
++      std::int64_t idx = insert_voxel(coord);
++      if (idx < 0) {
++        dropped++;
++        continue;
++      }
++      infos[idx].last_hit = stamp;
++      voxels[idx].add(voxel_setting, pt, points, i, T);
++      if (!(flags_[idx] & kDirty)) {
++        flags_[idx] |= kDirty;
++        dirty_[num_dirty++] = static_cast<std::int32_t>(idx);
++      }
++    }
++    for (size_t k = 0; k < num_dirty; k++) {
++      voxels[dirty_[k]].finalize();
++      flags_[dirty_[k]] &= static_cast<std::uint8_t>(~kDirty);
++    }
++    return dropped;
++  }
++
++  /// @brief Remove voxels last hit before `min_stamp`, or whose centre is farther than `radius`
++  ///        from `center` (radius <= 0 disables the crop).
++  /// @return Number of removed voxels.
++  size_t remove_stale(std::int64_t min_stamp, const Eigen::Vector3d& center, double radius) {
++    const double r2 = radius > 0.0 ? radius * radius : std::numeric_limits<double>::infinity();
++    size_t removed = 0;
++    size_t i = 0;
++    while (i < size_) {
++      const Eigen::Vector3d c = (infos[i].coord.template cast<double>() + Eigen::Vector3d::Constant(0.5)) * leaf_size_;
++      if (infos[i].last_hit < min_stamp || (c - center).squaredNorm() > r2) {
++        remove_at(i);  // moves the last voxel into i: test i again
++        removed++;
++      } else {
++        i++;
++      }
++    }
++    return removed;
++  }
++
++  /// @brief Evict the `count` least recently hit voxels (ties: lower index first).
++  void evict_lru(size_t count) {
++    count = std::min(count, size_);
++    if (count == 0) {
++      return;
++    }
++    for (size_t i = 0; i < size_; i++) {
++      lru_scratch_[i] = {infos[i].last_hit, static_cast<std::int32_t>(i)};
++    }
++    auto first = lru_scratch_.begin();
++    std::nth_element(first, first + (count - 1), first + size_);
++    for (size_t k = 0; k < count; k++) {
++      flags_[lru_scratch_[k].second] |= kEvict;
++    }
++    size_t i = 0;
++    while (i < size_) {
++      if (flags_[i] & kEvict) {
++        flags_[i] &= static_cast<std::uint8_t>(~kEvict);
++        remove_at(i);
++      } else {
++        i++;
++      }
++    }
++  }
++
++  /// @brief Dense index of the voxel at `coord`, creating an empty one if needed.
++  /// @return -1 if the pool is full. A new voxel has last_hit = INT64_MIN and default contents;
++  ///         the caller fills it and calls finalize_voxel() (used e.g. to re-bin a map).
++  std::int64_t insert_voxel(const Eigen::Vector3i& coord) {
++    size_t slot = hash(coord) & table_mask_;
++    while (true) {
++      const std::int32_t idx = table_[slot];
++      if (idx < 0) {
++        break;
++      }
++      if (infos[idx].coord == coord) {
++        return idx;
++      }
++      slot = (slot + 1) & table_mask_;
++    }
++    if (size_ >= capacity_) {
++      return -1;
++    }
++    const size_t idx = size_++;
++    table_[slot] = static_cast<std::int32_t>(idx);
++    infos[idx].coord = coord;
++    infos[idx].last_hit = std::numeric_limits<std::int64_t>::min();
++    voxels[idx] = VoxelContents();
++    flags_[idx] = 0;
++    return static_cast<std::int64_t>(idx);
++  }
++
++  /// @brief Finalize one voxel after manual edits (see insert_voxel()).
++  void finalize_voxel(size_t idx) { voxels[idx].finalize(); }
++
++  /// @brief Find the nearest neighbor among the voxels around `pt` (search offsets).
++  size_t nearest_neighbor_search(const Eigen::Vector4d& pt, size_t* index, double* sq_dist) const {
++    const Eigen::Vector3i center = coord_of(pt);
++    size_t voxel_index = 0;
++    const auto index_transform = [&](size_t i) { return calc_index(voxel_index, i); };
++    KnnResult<1, decltype(index_transform)> result(index, sq_dist, -1, index_transform);
++    for (size_t k = 0; k < num_offsets_; k++) {
++      const std::int64_t found = find(center + search_offsets_[k]);
++      if (found < 0) {
++        continue;
++      }
++      voxel_index = static_cast<size_t>(found);
++      traits::Traits<VoxelContents>::knn_search(voxels[voxel_index], pt, result);
++    }
++    return result.num_found();
++  }
++
++  /// @brief Find up to k nearest neighbors among the voxels around `pt`.
++  size_t knn_search(const Eigen::Vector4d& pt, size_t k, size_t* k_indices, double* k_sq_dists) const {
++    const Eigen::Vector3i center = coord_of(pt);
++    size_t voxel_index = 0;
++    const auto index_transform = [&](size_t i) { return calc_index(voxel_index, i); };
++    KnnResult<-1, decltype(index_transform)> result(k_indices, k_sq_dists, static_cast<int>(k), index_transform);
++    for (size_t j = 0; j < num_offsets_; j++) {
++      const std::int64_t found = find(center + search_offsets_[j]);
++      if (found < 0) {
++        continue;
++      }
++      voxel_index = static_cast<size_t>(found);
++      traits::Traits<VoxelContents>::knn_search(voxels[voxel_index], pt, result);
++    }
++    return result.num_found();
++  }
++
++  /// @brief Global point index from the voxel index and the point index inside the voxel.
++  inline size_t calc_index(const size_t voxel_id, const size_t point_id) const { return (voxel_id << point_id_bits) | point_id; }
++  inline size_t voxel_id(const size_t i) const { return i >> point_id_bits; }
++  inline size_t point_id(const size_t i) const { return i & ((1ull << point_id_bits) - 1); }
++
++  /// @brief Search pattern: 1 (centre), 7 (centre + 6 faces) or 27 (3x3x3). Others -> 1.
++  void set_search_offsets(int num_offsets) {
++    num_offsets_ = 0;
++    if (num_offsets == 27) {
++      for (int i = -1; i <= 1; i++) {
++        for (int j = -1; j <= 1; j++) {
++          for (int k = -1; k <= 1; k++) {
++            search_offsets_[num_offsets_++] = Eigen::Vector3i(i, j, k);
++          }
++        }
++      }
++    } else if (num_offsets == 7) {
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, 0, 0);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(1, 0, 0);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(-1, 0, 0);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, 1, 0);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, -1, 0);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, 0, 1);
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, 0, -1);
++    } else {
++      search_offsets_[num_offsets_++] = Eigen::Vector3i(0, 0, 0);
++    }
++  }
++  int num_search_offsets() const { return static_cast<int>(num_offsets_); }
++
++public:
++  typename VoxelContents::Setting voxel_setting;  ///< Voxel setting
++  std::vector<FixedVoxelInfo> infos;              ///< Dense voxel bookkeeping [0, size())
++  std::vector<VoxelContents> voxels;              ///< Dense voxel contents [0, size())
++
++private:
++  static constexpr std::uint8_t kDirty = 1;
++  static constexpr std::uint8_t kEvict = 2;
++
++  static size_t hash(const Eigen::Vector3i& c) {
++    // 64-bit mix of the three coordinates (deterministic, platform independent).
++    std::uint64_t h = static_cast<std::uint64_t>(static_cast<std::uint32_t>(c[0])) * 0x9E3779B97F4A7C15ull;
++    h ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(c[1])) * 0xC2B2AE3D27D4EB4Full + (h << 6) + (h >> 2);
++    h ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(c[2])) * 0x165667B19E3779F9ull + (h << 6) + (h >> 2);
++    h ^= h >> 31;
++    h *= 0xD6E8FEB86659FD93ull;
++    h ^= h >> 32;
++    return static_cast<size_t>(h);
++  }
++
++  size_t slot_of(const Eigen::Vector3i& coord) const {
++    size_t slot = hash(coord) & table_mask_;
++    while (infos[table_[slot]].coord != coord) {
++      slot = (slot + 1) & table_mask_;
++    }
++    return slot;
++  }
++
++  /// Backward-shift deletion for linear probing: no tombstones, table stays exact.
++  void table_erase(size_t slot) {
++    size_t i = slot;
++    size_t j = slot;
++    while (true) {
++      table_[i] = -1;
++      while (true) {
++        j = (j + 1) & table_mask_;
++        if (table_[j] < 0) {
++          return;
++        }
++        const size_t k = hash(infos[table_[j]].coord) & table_mask_;
++        const bool stays = (i <= j) ? (i < k && k <= j) : (i < k || k <= j);
++        if (!stays) {
++          break;
++        }
++      }
++      table_[i] = table_[j];
++      i = j;
++    }
++  }
++
++  /// Remove the voxel at dense index i; the last voxel moves into i.
++  void remove_at(size_t i) {
++    table_erase(slot_of(infos[i].coord));
++    const size_t last = size_ - 1;
++    if (i != last) {
++      table_[slot_of(infos[last].coord)] = static_cast<std::int32_t>(i);
++      infos[i] = infos[last];
++      voxels[i] = std::move(voxels[last]);
++      flags_[i] = flags_[last];
++    }
++    size_--;
++  }
++
++  size_t capacity_;
++  size_t size_;
++  double inv_leaf_size_;
++  double leaf_size_;
++  size_t table_mask_ = 0;
++  std::vector<std::int32_t> table_;
++  std::vector<std::int32_t> dirty_;
++  std::vector<std::uint8_t> flags_;
++  std::vector<std::pair<std::int64_t, std::int32_t>> lru_scratch_;
++  Eigen::Vector3i search_offsets_[27];
++  size_t num_offsets_ = 0;
++};
++
++namespace traits {
++
++template <typename VoxelContents>
++struct Traits<FixedIncrementalVoxelMap<VoxelContents>> {
++  static size_t size(const FixedIncrementalVoxelMap<VoxelContents>& map) { return map.size(); }
++
++  static Eigen::Vector4d point(const FixedIncrementalVoxelMap<VoxelContents>& map, size_t i) {
++    return traits::point(map.voxels[map.voxel_id(i)], map.point_id(i));
++  }
++  static Eigen::Vector4d normal(const FixedIncrementalVoxelMap<VoxelContents>& map, size_t i) {
++    return traits::normal(map.voxels[map.voxel_id(i)], map.point_id(i));
++  }
++  static Eigen::Matrix4d cov(const FixedIncrementalVoxelMap<VoxelContents>& map, size_t i) {
++    return traits::cov(map.voxels[map.voxel_id(i)], map.point_id(i));
++  }
++
++  static size_t nearest_neighbor_search(const FixedIncrementalVoxelMap<VoxelContents>& map, const Eigen::Vector4d& pt, size_t* k_index, double* k_sq_dist) {
++    return map.nearest_neighbor_search(pt, k_index, k_sq_dist);
++  }
++
++  static size_t knn_search(const FixedIncrementalVoxelMap<VoxelContents>& map, const Eigen::Vector4d& pt, size_t k, size_t* k_index, double* k_sq_dist) {
++    return map.knn_search(pt, k, k_index, k_sq_dist);
++  }
++};
++
++}  // namespace traits
++
++}  // namespace small_gicp

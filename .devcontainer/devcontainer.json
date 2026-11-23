@@ -1,0 +1,50 @@
+// Optional: open the repo inside the STRIDE dev image. Claude Code normally stays on the host
+// and drives Docker through scripts/dc (CLAUDE.md); this container is for people who prefer it.
+// The workspace is mounted at its host path, so logs, compile_commands.json and Claude's
+// per-project memory key match the host.
+{
+  "name": "stride-lo (dev)",
+  "build": {
+    "dockerfile": "../docker/Dockerfile",
+    "context": "..",
+    "target": "dev",
+    "args": {"BUILD_JOBS": "3"}
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "runArgs": ["--network=host", "--ipc=host"],
+  "containerEnv": {
+    "STRIDE_WS": "${localWorkspaceFolder}",
+    "CCACHE_DIR": "${localWorkspaceFolder}/.ccache",
+    "BUILD_JOBS": "3"
+  },
+  "mounts": [
+    // test bags, read-only: the GPS-denied repo's rosbags/ (must exist on the host). Nested
+    // defaults like ${localEnv:A:${localEnv:B}} are not supported by Dev Containers; to use
+    // another bags dir, edit this path (scripts/dc honours STRIDE_BAGS_DIR instead).
+    "source=${localEnv:HOME}/GPS-denied_State_estimation_Qudrapad/rosbags,target=/data/bags,type=bind,readonly"
+    // Optional, to bring the Claude login, plans and memory into the container (uncomment;
+    // the sources must exist on the host):
+    // ,"source=${localEnv:HOME}/.claude/projects,target=/home/dev/.claude/projects,type=bind"
+    // ,"source=${localEnv:HOME}/.claude/plans,target=/home/dev/.claude/plans,type=bind"
+    // ,"source=${localEnv:HOME}/.claude/settings.json,target=/home/dev/.claude/settings.json,type=bind"
+    // ,"source=${localEnv:HOME}/.claude/.credentials.json,target=/home/dev/.claude/.credentials.json,type=bind"
+    // ,"source=${localEnv:HOME}/.claude.json,target=/home/dev/.claude.json,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-python.python"
+      ],
+      "settings": {
+        "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json"
+      }
+    }
+  },
+  "postCreateCommand": "echo 'build: scripts/build.sh   test: scripts/test.sh'"
+}

@@ -1,0 +1,161 @@
+--- a/src/third_party/small_gicp/include/small_gicp/registration/reduction_omp.hpp	2026-11-21 23:50:02.247310365 +0530
++++ b/src/third_party/small_gicp/include/small_gicp/registration/reduction_omp.hpp	2026-11-21 23:55:09.940630292 +0530
+@@ -1,9 +1,28 @@
+ // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
+ // SPDX-License-Identifier: MIT
++//
++// STRIDE patch 0002 (patches/small_gicp/0002-deterministic-omp-reduction.patch):
++// the upstream reduction allocated three std::vectors per call and used schedule(guided), whose
++// dynamic chunk assignment makes the floating-point summation order (and so the result bits)
++// differ run to run. Here every thread sums one fixed contiguous block of factors in index
++// order into stack storage, and the per-thread partial sums are combined in thread order.
++// With a fixed team size (omp_set_dynamic(0)), the result is bit-identical across runs and no
++// heap memory is touched.
+ #pragma once
+ 
++#include <algorithm>
++#include <cstdint>
++#include <tuple>
++#include <vector>
++
+ #include <Eigen/Core>
+ 
++#ifdef _OPENMP
++#include <omp.h>
++#endif
++
++#define SMALL_GICP_STRIDE_DETERMINISTIC_OMP 1
++
+ namespace small_gicp {
+ 
+ #ifndef _OPENMP
+@@ -15,10 +34,16 @@
+ inline int omp_get_thread_num() {
+   return 0;
+ }
++inline int omp_get_num_threads() {
++  return 1;
++}
+ #endif
+ 
+-/// @brief Parallel reduction with OpenMP backend
++/// @brief Parallel reduction with OpenMP backend (deterministic, allocation-free).
+ struct ParallelReductionOMP {
++  /// Upper bound of the team size (partial sums live on the stack).
++  static constexpr int max_threads = 64;
++
+   ParallelReductionOMP() : num_threads(4) {}
+ 
+   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree, typename CorrespondenceRejector, typename Factor>
+@@ -29,44 +54,85 @@
+     const CorrespondenceRejector& rejector,
+     const Eigen::Isometry3d& T,
+     std::vector<Factor>& factors) const {
+-    std::vector<Eigen::Matrix<double, 6, 6>> Hs(num_threads, Eigen::Matrix<double, 6, 6>::Zero());
+-    std::vector<Eigen::Matrix<double, 6, 1>> bs(num_threads, Eigen::Matrix<double, 6, 1>::Zero());
+-    std::vector<double> es(num_threads, 0.0);
+-
+-#pragma omp parallel for num_threads(num_threads) schedule(guided, 8)
+-    for (std::int64_t i = 0; i < factors.size(); i++) {
+-      Eigen::Matrix<double, 6, 6> H;
+-      Eigen::Matrix<double, 6, 1> b;
+-      double e;
++    const int requested = std::max(1, std::min(num_threads, max_threads));
++    Eigen::Matrix<double, 6, 6> Hs[max_threads];
++    Eigen::Matrix<double, 6, 1> bs[max_threads];
++    double es[max_threads];
++    for (int t = 0; t < requested; t++) {
++      Hs[t].setZero();
++      bs[t].setZero();
++      es[t] = 0.0;
++    }
++    int team_size = 1;
++    const std::int64_t n = static_cast<std::int64_t>(factors.size());
+ 
+-      if (!factors[i].linearize(target, source, target_tree, T, i, rejector, &H, &b, &e)) {
+-        continue;
++#pragma omp parallel num_threads(requested)
++    {
++      const int t = omp_get_thread_num();
++      const int team = omp_get_num_threads();
++      if (t == 0) {
++        team_size = team;
+       }
+-
+-      const int thread_id = omp_get_thread_num();
+-      Hs[thread_id] += H;
+-      bs[thread_id] += b;
+-      es[thread_id] += e;
++      const std::int64_t begin = n * t / team;
++      const std::int64_t end = n * (t + 1) / team;
++      Eigen::Matrix<double, 6, 6> sum_H = Eigen::Matrix<double, 6, 6>::Zero();
++      Eigen::Matrix<double, 6, 1> sum_b = Eigen::Matrix<double, 6, 1>::Zero();
++      double sum_e = 0.0;
++      for (std::int64_t i = begin; i < end; i++) {
++        Eigen::Matrix<double, 6, 6> H;
++        Eigen::Matrix<double, 6, 1> b;
++        double e;
++        if (!factors[i].linearize(target, source, target_tree, T, i, rejector, &H, &b, &e)) {
++          continue;
++        }
++        sum_H += H;
++        sum_b += b;
++        sum_e += e;
++      }
++      Hs[t] = sum_H;
++      bs[t] = sum_b;
++      es[t] = sum_e;
+     }
+ 
+-    for (int i = 1; i < num_threads; i++) {
+-      Hs[0] += Hs[i];
+-      bs[0] += bs[i];
+-      es[0] += es[i];
++    for (int t = 1; t < team_size; t++) {
++      Hs[0] += Hs[t];
++      bs[0] += bs[t];
++      es[0] += es[t];
+     }
+-
+     return {Hs[0], bs[0], es[0]};
+   }
+ 
+   template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>
+   double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, std::vector<Factor>& factors) const {
+-    double sum_e = 0.0;
++    const int requested = std::max(1, std::min(num_threads, max_threads));
++    double es[max_threads];
++    for (int t = 0; t < requested; t++) {
++      es[t] = 0.0;
++    }
++    int team_size = 1;
++    const std::int64_t n = static_cast<std::int64_t>(factors.size());
++
++#pragma omp parallel num_threads(requested)
++    {
++      const int t = omp_get_thread_num();
++      const int team = omp_get_num_threads();
++      if (t == 0) {
++        team_size = team;
++      }
++      const std::int64_t begin = n * t / team;
++      const std::int64_t end = n * (t + 1) / team;
++      double sum_e = 0.0;
++      for (std::int64_t i = begin; i < end; i++) {
++        sum_e += factors[i].error(target, source, T);
++      }
++      es[t] = sum_e;
++    }
+ 
+-#pragma omp parallel for num_threads(num_threads) schedule(guided, 8) reduction(+ : sum_e)
+-    for (std::int64_t i = 0; i < factors.size(); i++) {
+-      sum_e += factors[i].error(target, source, T);
++    double sum = 0.0;
++    for (int t = 0; t < team_size; t++) {
++      sum += es[t];
+     }
+-    return sum_e;
++    return sum;
+   }
+ 
+   int num_threads;  ///< Number of threads

@@ -1,0 +1,73 @@
+--- a/src/third_party/small_gicp/include/small_gicp/ann/kdtree.hpp	2026-11-21 23:50:02.246727466 +0530
++++ b/src/third_party/small_gicp/include/small_gicp/ann/kdtree.hpp	2026-11-22 01:09:19.183155779 +0530
+@@ -49,6 +49,11 @@
+ 
+ namespace small_gicp {
+ 
++/// STRIDE patch 0003: tag to construct an UnsafeKdTree without building it (see rebuild()).
++#define SMALL_GICP_STRIDE_KDTREE_REBUILD 1
++struct DeferredBuild {};
++inline constexpr DeferredBuild deferred_build{};
++
+ using NodeIndexType = std::uint32_t;
+ static constexpr NodeIndexType INVALID_NODE = std::numeric_limits<NodeIndexType>::max();
+ 
+@@ -152,6 +157,29 @@
+     builder.build_tree(*this, points);
+   }
+ 
++  /// @brief Constructor without building (STRIDE patch 0003). Call rebuild() once `points` is
++  ///        filled; `points` must outlive the tree (it is held by reference).
++  UnsafeKdTree(const PointCloud& points, DeferredBuild) : points(points), root(INVALID_NODE) {}
++
++  /// @brief Rebuild the tree in place for the current contents of `points` (STRIDE patch 0003).
++  /// @note  `indices` and `nodes` keep their capacity, so once they have reached the largest
++  ///        cloud size this never allocates. Use the serial KdTreeBuilder for a deterministic
++  ///        node layout.
++  /// @note  Both vectors are cleared first: the builders do not reset `left`/`right` of leaf
++  ///        nodes, so reusing old elements would leave stale child links (wrong neighbours,
++  ///        possible cycles). clear() + the builder's resize() value-initialises every node
++  ///        without reallocating.
++  template <typename Builder = KdTreeBuilder>
++  void rebuild(const Builder& builder = Builder()) {
++    indices.clear();
++    nodes.clear();
++    root = INVALID_NODE;
++    if (traits::size(points) == 0) {
++      return;
++    }
++    builder.build_tree(*this, points);
++  }
++
+   /// @brief Find the nearest neighbor.
+   /// @param query        Query point
+   /// @param k_indices    Index of the nearest neighbor (uninitialized if not found)
+@@ -171,6 +199,9 @@
+   /// @return             Number of found neighbors
+   size_t knn_search(const Eigen::Vector4d& query, int k, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+     KnnResult<-1> result(k_indices, k_sq_dists, k);
++    if (nodes.empty() || root == INVALID_NODE) {
++      return 0;
++    }
+     knn_search(query, root, result, setting);
+     return result.num_found();
+   }
+@@ -184,6 +215,9 @@
+   template <int N>
+   size_t knn_search(const Eigen::Vector4d& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+     KnnResult<N> result(k_indices, k_sq_dists);
++    if (nodes.empty() || root == INVALID_NODE) {
++      return 0;
++    }
+     knn_search(query, root, result, setting);
+     return result.num_found();
+   }
+@@ -236,7 +270,7 @@
+   const PointCloud& points;     ///< Input points
+   std::vector<size_t> indices;  ///< Point indices refered by nodes
+ 
+-  NodeIndexType root;       ///< Root node index (should be zero)
++  NodeIndexType root = INVALID_NODE;  ///< Root node index (should be zero)
+   std::vector<Node> nodes;  ///< Kd-tree nodes
+ };
+ 

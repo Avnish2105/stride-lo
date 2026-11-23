@@ -1,0 +1,7 @@
+Upstream: https://github.com/koide3/small_gicp.git
+Tag:      v1.0.1
+Commit:   57c1106daf83c2c79ee0c58a9c7ed0032298ff4e
+Vendored: 2026-11-21 by scripts/vendor_small_gicp.sh (pristine; pruned: .git .github
+          data docs src/benchmark src/python src/example src/test include/small_gicp/benchmark)
+Patches:  patches/small_gicp/*.patch, applied by scripts/build.sh (see patches/README.md)
+License:  MIT (LICENSE in this directory)

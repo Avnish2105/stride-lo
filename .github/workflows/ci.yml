@@ -1,0 +1,55 @@
+# Build (Release, -Wall -Werror), unit tests, synthetic fault suite, determinism and allocation
+# tests, clang-tidy, small_gicp patch check (build.sh fails if a patch no longer applies).
+name: ci
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      BUILD_JOBS: 2
+      STRIDE_BAGS_DIR: ${{ github.workspace }}/.no_bags
+    steps:
+      - uses: actions/checkout@v4
+      - id: ids
+        run: |
+          echo "uid=$(id -u)" >> "$GITHUB_OUTPUT"
+          echo "gid=$(id -g)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$STRIDE_BAGS_DIR"
+      - uses: docker/setup-buildx-action@v3
+      - name: CI image (layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: ci
+          tags: stride-lo:ci
+          load: true
+          cache-from: type=gha,scope=stride-ci
+          cache-to: type=gha,mode=max,scope=stride-ci
+          build-args: |
+            BUILD_JOBS=2
+            USER_UID=${{ steps.ids.outputs.uid }}
+            USER_GID=${{ steps.ids.outputs.gid }}
+      - name: Build
+        run: scripts/dc run --rm ci scripts/build.sh
+      - name: Tests (unit, fault suite, determinism, zero allocations)
+        run: scripts/dc run --rm ci scripts/test.sh
+      - name: Fault suite summary
+        run: scripts/dc run --rm ci bash -c 'source install/setup.bash && lo_synth_run suite'
+      - name: clang-tidy
+        run: scripts/dc run --rm ci scripts/tidy.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-logs
+          path: |
+            log/
+            build/*/test_results/

@@ -1,0 +1,29 @@
+# STRIDE LiDAR odometry: generic Livox Mid-360 settings (ROS parameters of node `stride_lo`).
+# Every lo_core parameter, its range and its default is in lo_core/config/schema.hpp; only the
+# values that differ from those defaults, and the ROS-layer settings, belong here.
+# Robot files (config/<robot>.yaml) are loaded after this one and override it.
+stride_lo:
+  ros__parameters:
+    topics:
+      lidar: /livox/lidar               # livox_ros_driver2/CustomMsg (xfer_format 1)
+      imu: /livox/imu                   # Mid-360 internal IMU (DECISIONS C1)
+      joints: /joint_states
+      graph_odom: ""                    # nav_msgs/Odometry of the graph: translation seed
+      node_request: ""                  # lo_msgs/NodeRequest: set with emit.mode: request
+      ptp_offset: ""                    # std_msgs/Float64 from a PTP monitor [s]
+    frames:
+      base: base_link
+      lidar: livox_frame
+      imu: livox_frame                  # the Livox driver stamps its IMU in livox_frame
+      odom: stride_odom
+    imu:
+      accel_scale: 9.80665              # livox_ros_driver2 publishes acceleration in g
+    extrinsics:
+      source: tf                        # tf (URDF via robot_state_publisher) | params
+    emit:
+      mode: overlap                     # overlap | request (needs topics.node_request)
+    debug:
+      publish_deskewed: false
+      map_period: 2.0
+    blackbox:
+      directory: ~/.ros/stride_blackbox

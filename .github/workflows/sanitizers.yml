@@ -1,0 +1,42 @@
+# ASan, UBSan and TSan builds of the whole workspace, each running every test.
+name: sanitizers
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+jobs:
+  sanitizer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined, thread]
+    env:
+      BUILD_JOBS: 2
+      STRIDE_BAGS_DIR: ${{ github.workspace }}/.no_bags
+    steps:
+      - uses: actions/checkout@v4
+      - id: ids
+        run: |
+          echo "uid=$(id -u)" >> "$GITHUB_OUTPUT"
+          echo "gid=$(id -g)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$STRIDE_BAGS_DIR"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: ci
+          tags: stride-lo:ci
+          load: true
+          cache-from: type=gha,scope=stride-ci
+          build-args: |
+            BUILD_JOBS=2
+            USER_UID=${{ steps.ids.outputs.uid }}
+            USER_GID=${{ steps.ids.outputs.gid }}
+      - name: Build (${{ matrix.sanitizer }})
+        run: scripts/dc run --rm ci scripts/build.sh --sanitizer=${{ matrix.sanitizer }}
+      - name: Test (${{ matrix.sanitizer }})
+        run: scripts/dc run --rm ci scripts/test.sh --sanitizer=${{ matrix.sanitizer }}

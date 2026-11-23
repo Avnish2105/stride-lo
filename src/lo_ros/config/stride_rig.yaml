@@ -1,0 +1,18 @@
+# lo_sim Gazebo sensor rig (~0.5 m quadruped body, Mid-360 front-top, dome up, 20 deg down).
+stride_lo:
+  ros__parameters:
+    topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      joints: /joint_states
+    frames:
+      base: base
+      lidar: livox_frame
+      imu: livox_frame
+    imu:
+      accel_scale: 9.80665
+    self_filter:
+      body_box: [-0.40, -0.22, -0.15, 0.42, 0.22, 0.20]
+      robot_description_topic: /robot_description
+    extrinsics:
+      source: tf

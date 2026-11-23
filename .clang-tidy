@@ -1,0 +1,22 @@
+# clang-tidy for STRIDE's own packages (scripts/tidy.sh; CI). Vendored small_gicp is excluded.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-exception-escape,
+  clang-analyzer-*,
+  -clang-analyzer-optin.*,
+  performance-*,
+  -performance-enum-size,
+  -performance-avoid-endl,
+  modernize-use-override,
+  modernize-use-nullptr,
+  misc-redundant-expression,
+  cppcoreguidelines-slicing,
+  readability-container-size-empty,
+  readability-misleading-indentation
+WarningsAsErrors: 'bugprone-*,clang-analyzer-core.*,performance-unnecessary-copy-initialization,cppcoreguidelines-slicing'
+HeaderFilterRegex: '.*/src/lo_(core|ros|synth|tools|gtsam_adapter)/.*'
+FormatStyle: none

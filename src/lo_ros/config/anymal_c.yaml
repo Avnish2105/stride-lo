@@ -1,0 +1,38 @@
+# ANYmal C in the GPS-denied repo's Gazebo sim (and its recorded bags). Mid-360 at the front,
+# on its side, dome forward, 20 deg down (base -> livox_frame: 0.60 0 0.08, rpy 0 110 0): the
+# legs are out of view, so the self-filter needs only the body box.
+stride_lo:
+  ros__parameters:
+    topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      joints: /joint_states
+      graph_odom: /estimator/odometry   # factor_graph_estimator IMU-rate odometry (seed only)
+    frames:
+      base: base
+      lidar: livox_frame
+      imu: livox_frame
+    imu:
+      accel_scale: 9.80665
+      sample_convention: interval_mean  # the sim imu_emulator publishes means over (t_prev, t]
+      # = the emulated driver stamp latency (imu_errors:=realistic: latency 2 ms + jitter),
+      # measured 2.0-2.5 ms against the 1 kHz truth and by time_offset.py (DECISIONS I25, I34).
+      # Re-measure on a real robot.
+      time_offset: -0.00225
+    scan:
+      # The sim Mid-360 emulator takes each point's geometry from the 50 Hz gpu_lidar render
+      # nearest in time (renders on the 20 ms sim-time grid) while stamping points continuously:
+      # snap point times to the renders (test data only; real sensors: 0). DECISIONS I25.
+      time_quantum: 0.02
+      time_quantum_phase: 0.0
+    self_filter:
+      body_box: [-0.55, -0.25, -0.15, 0.55, 0.25, 0.15]
+      leg_box: [-0.75, -0.45, -0.65, 0.75, 0.45, 0.05]
+      robot_description_topic: ""       # bags carry no URDF; legs are not in view anyway
+    extrinsics:
+      source: tf
+    clock:
+      # The sim's delivery-latency floor wanders by up to 13 ms (yard 1: rolling-min LiDAR
+      # latency 9..20 ms, IMU -5.6..2.2 ms), so the arrival-based skew proxy cannot resolve 2 ms
+      # there. Sim clocks are exact; stamp jumps are still caught by the scan validator.
+      check_skew: false
