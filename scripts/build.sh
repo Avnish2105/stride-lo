@@ -3,7 +3,14 @@
 #   scripts/dc run --rm dev scripts/build.sh                         Release, whole workspace
 #   scripts/dc run --rm dev scripts/build.sh --sanitizer=address     ASan into build_address/ ...
 #   scripts/dc run --rm dev scripts/build.sh --packages-select lo_core   (extra args -> colcon)
-# Sanitizers: address | undefined | thread. Parallelism: BUILD_JOBS (default 3).
+# (Inside the dev container drop the `scripts/dc run --rm dev` prefix.)
+# Sanitizers: address | undefined | thread. Parallelism: BUILD_JOBS compile jobs (default 3) per
+# package x BUILD_WORKERS packages (default 2, colcon_defaults.yaml). VERBOSE=1: full output.
+# Useful colcon selections (any colcon build option is passed through):
+#   --packages-select lo_core          just this package
+#   --packages-above lo_core           this package and everything that depends on it
+#   --packages-up-to lo_tools          this package and its dependencies
+#   --packages-select-build-failed     retry what failed last time
 #
 # small_gicp: src/third_party/small_gicp stays pristine (it has a COLCON_IGNORE). This script
 # copies it to .stride_patched/small_gicp, applies patches/small_gicp/*.patch there, and colcon
@@ -34,22 +41,37 @@ if [ -z "${AMENT_PREFIX_PATH:-}" ] || [ -z "${STRIDE_UNDERLAY:-}" ]; then
 fi
 
 jobs="${BUILD_JOBS:-3}"
-export MAKEFLAGS="-j${jobs}"
+# Ninja ignores MAKEFLAGS; `cmake --build` passes CMAKE_BUILD_PARALLEL_LEVEL on as -j. Keep the
+# MAKEFLAGS -j too: it stops colcon from adding its own -j<nproc>.
+export CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" MAKEFLAGS="-j${jobs}"
 suffix=""
 [ -n "$sanitizer" ] && suffix="_${sanitizer}"
-cmake_args=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-            "-DSTRIDE_SANITIZER=${sanitizer}")
-if command -v ccache >/dev/null 2>&1; then
-  cmake_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
-fi
+build_base="build${suffix}"
 
-colcon --log-base "log${suffix}" build \
-  --base-paths src .stride_patched \
-  --build-base "build${suffix}" --install-base "install${suffix}" \
-  --symlink-install --parallel-workers "${BUILD_WORKERS:-2}" \
-  --event-handlers console_cohesion+ \
-  --cmake-args "${cmake_args[@]}" \
-  "${args[@]}"
+# Generator migration (Unix Makefiles -> Ninja, colcon_defaults.yaml): CMake refuses to switch
+# the generator of an existing build dir, so drop those package build dirs once (cache only).
+for cache in "$build_base"/*/CMakeCache.txt; do
+  [ -f "$cache" ] || continue
+  if ! grep -q '^CMAKE_GENERATOR:INTERNAL=Ninja$' "$cache"; then
+    echo "build.sh: $(dirname "$cache") was configured with another generator; re-creating it"
+    rm -rf "$(dirname "$cache")"
+  fi
+done
+
+# Common options (base paths, symlink install, Ninja, ccache, quiet output) come from
+# colcon_defaults.yaml. Only the sanitizer build overrides paths and CMake arguments.
+# VERBOSE=1 prints every package's full output (console_cohesion) instead of errors only.
+extra=()
+if [ -n "$sanitizer" ]; then
+  extra+=(--build-base "$build_base" --install-base "install${suffix}"
+          --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          "-DSTRIDE_SANITIZER=${sanitizer}"
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+fi
+[ "${VERBOSE:-0}" = 1 ] && extra+=(--event-handlers console_cohesion+ status-)
+[ -n "${BUILD_WORKERS:-}" ] && extra+=(--parallel-workers "$BUILD_WORKERS")
+
+colcon --log-base "log${suffix}" build "${extra[@]}" "${args[@]}"
 
 # One compile_commands.json at the root for the editor (Release build only).
 if [ -z "$sanitizer" ]; then

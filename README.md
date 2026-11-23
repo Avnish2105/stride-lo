@@ -50,9 +50,15 @@ own path; bags are mounted read-only at `/data/bags` (`STRIDE_BAGS_DIR`).
 ```bash
 scripts/dc build dev
 scripts/dc run --rm dev scripts/build.sh                      # Release, -Wall -Werror
-scripts/dc run --rm dev scripts/test.sh                       # 62 tests
+scripts/dc run --rm dev scripts/test.sh                       # 62 tests, parallel ctest
+scripts/dc run --rm dev scripts/test.sh --quick               # skip the slow fault suite
+scripts/dc run --rm dev scripts/build.sh --packages-select lo_core   # any colcon selection
 scripts/dc run --rm dev scripts/build.sh --sanitizer=address  # also undefined | thread
 ```
+
+Inside the dev container drop the `scripts/dc run --rm dev` prefix. colcon options shared by
+the scripts and a bare `colcon build` (Ninja, ccache, symlink install, quiet output) are in
+`colcon_defaults.yaml`; `VERBOSE=1` shows full build/test output.
 
 ## Demo: buttons in VS Code
 
@@ -146,8 +152,8 @@ ros2 run lo_tools live_check.sh BAG live_out 60                             # li
 | Command | What it does |
 |---|---|
 | `scripts/dc` | `docker compose` wrapper (host side): mounts the repo at its own path, bags from `STRIDE_BAGS_DIR` at `/data/bags` (read-only), runs as your uid. `dc build dev`, `dc run --rm dev <cmd>`. |
-| `scripts/build.sh` | colcon Release build with `-Wall -Werror`; `--sanitizer=address\|undefined\|thread` builds into `build_<san>/`; extra args go to colcon. Applies the small_gicp patches first. |
-| `scripts/test.sh` | `colcon test` + results for the Release or a sanitizer build. |
+| `scripts/build.sh` | colcon Release build (Ninja + ccache, `colcon_defaults.yaml`) with `-Wall -Werror`; `--sanitizer=address\|undefined\|thread` builds into `build_<san>/`; extra args go to colcon. Applies the small_gicp patches first. |
+| `scripts/test.sh` | `colcon test` (ctest `-j TEST_JOBS`, default 4) + results for the Release or a sanitizer build; `--quick` skips tests labelled `slow`. |
 | `scripts/check_consumer.sh [BAG]` | builds `examples/minimal_backend` in a fresh workspace against `install/` (proves the package exports); with a bag, runs it live against `stride_lo` and checks the factors. |
 | `scripts/tidy.sh` | clang-tidy over STRIDE's own C++ (needs `compile_commands.json` from a build). |
 | `scripts/patch_small_gicp.sh` | copies the pristine `src/third_party/small_gicp` to `.stride_patched/` and applies `patches/small_gicp/*.patch` (called by `build.sh`). |

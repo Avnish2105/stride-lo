@@ -65,6 +65,14 @@ if(BUILD_TESTING)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} PRIVATE lo_synth GTest::gtest GTest::gtest_main)
     stride_target_flags(${test_name})
-    gtest_discover_tests(${test_name} DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 3600)
+    # `slow` = the synthetic fault suite + nominal accuracy runs (tens of seconds each);
+    # `scripts/test.sh --quick` skips them. Allocation and determinism tests always run.
+    # One label only: gtest_discover_tests flattens a list-valued property.
+    set(test_label synth)
+    if(test_name STREQUAL "test_fault_suite")
+      set(test_label slow)
+    endif()
+    gtest_discover_tests(${test_name} DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120
+      PROPERTIES TIMEOUT 3600 LABELS ${test_label})
   endforeach()
 endif()

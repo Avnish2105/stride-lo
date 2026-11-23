@@ -92,6 +92,14 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
   Live, yard 1, 40 s, request mode: 262 factors accepted, 0 unmatched, 0 non-SPD, 0 chain breaks.
   New test: all shipped params files (incl. the template) validate with no unknown keys.
   63 tests green. No lo_core change: replay output unchanged.
+- **Dev loop** (2026-11-23). No algorithm change. `colcon_defaults.yaml` (Ninja, ccache,
+  symlink install, quiet output) shared by the scripts and a bare `colcon build`; ctest runs
+  `-j TEST_JOBS` (4); fault suite labelled `slow`, `scripts/test.sh --quick` skips it.
+  Laptop, same build: lo_synth tests serial 320 s → `-j4` 101 s (`-j8` 94 s); full `test.sh`
+  63 tests ~101 s (was 310–950 s in the logs); `--quick` 50 tests 13 s; Ninja migration
+  rebuild 42 s (95 % ccache hits); no-op build < 1 s. Build/test console output 430/1070 →
+  ~20/30 lines. CLAUDE.md rewritten (container environment, on-demand docs, long-job rules);
+  `docs/ARCHITECTURE.md` expanded into the entry-point mental model.
 
 ---
 

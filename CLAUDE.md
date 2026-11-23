@@ -2,10 +2,16 @@
 
 Integrity-checked LiDAR odometry for quadrupeds: Livox Mid-360 → IMU-free relative-pose
 factors (`lo_msgs/LoFactor`) for a GTSAM backend. ROS 2 Jazzy, CPU-only, Jetson AGX Orin target.
+Status: phases 0–5 + integration done; what is left needs the robot (docs/PLAN.md "Remaining").
 
-**Read first:** [docs/DESIGN.md](docs/DESIGN.md) (the spec, transcribed from
-`docs/design/*.pdf`), [docs/DECISIONS.md](docs/DECISIONS.md) (every open point resolved, with
-reasons), [docs/PLAN.md](docs/PLAN.md) (phases, gates, status, results).
+## Orientation: read on demand, not up front
+Start with [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (packages, scan data flow, state
+machine, "where to change X"). The other docs are long: open only what the task needs and
+`grep -n` for the section or I-number instead of reading them whole.
+- [docs/DESIGN.md](docs/DESIGN.md): the spec (transcribed from `docs/design/*.pdf`; don't open the PDF).
+- [docs/DECISIONS.md](docs/DECISIONS.md): the resolved open points D1–D8 and implementation interpretations I1–I40, one table row each.
+- [docs/PLAN.md](docs/PLAN.md): status table + results log on top; below "# Approved plan" is history.
+- [docs/INTEGRATION.md](docs/INTEGRATION.md), [docs/TUNING.md](docs/TUNING.md), [docs/SMALL_GICP.md](docs/SMALL_GICP.md).
 
 ## Hard rules (from the spec — never trade these away)
 1. **No IMU information in the factor.** The gyro only deskews and seeds; the gyro check may only
@@ -29,26 +35,41 @@ reasons), [docs/PLAN.md](docs/PLAN.md) (phases, gates, status, results).
     project: its bags are test data, its estimator is the future consumer. Don't modify it.
 
 ## Environment
-- The host (Ubuntu 26.04) has no ROS/compiler. Everything runs in the `stride-lo:dev` image via
-  `scripts/dc` (compose wrapper; repo mounted at its own host path, bags read-only at
-  `/data/bags`, container user = host uid):
-  ```bash
-  scripts/dc build dev                        # image (GTSAM 4.3, Livox driver, Sophus, Gazebo)
-  scripts/dc run --rm dev scripts/build.sh    # Release build (--sanitizer=address|undefined|thread)
-  scripts/dc run --rm dev scripts/test.sh     # all tests
-  ```
-- Claude runs on the host and drives Docker; it does not reopen the folder in the container.
-- Keep `BUILD_JOBS` ≤ 3 on the 14 GB laptop (GTSAM and heavy TUs).
+- Claude usually runs **inside** the `stride-lo:dev` container (VS Code devcontainer:
+  `/.dockerenv` exists, `colcon`/`ros2` on PATH). Run `scripts/build.sh`, `scripts/test.sh`
+  directly. On the host (no ROS/compiler) prefix them with `scripts/dc run --rm dev`.
+- Bags: read-only at `/data/bags`. 14 GB laptop: keep `BUILD_JOBS` ≤ 3 (GTSAM TUs).
+- colcon settings live in `colcon_defaults.yaml` (Ninja, ccache, symlink install, quiet output),
+  so a bare `colcon build --packages-select X` matches `scripts/build.sh`. Don't pass other
+  `--cmake-args`: a changed CMake argument reconfigures and rebuilds the package.
 
-## Layout
-`src/lo_core` (pipeline), `src/lo_synth` (simulator lib), `src/lo_msgs`, `src/lo_ros` (lifecycle
-node, supervisor, black box, configs), `src/lo_gtsam_adapter` (+ `lo_graph_demo`), `src/lo_tools`
-(replay, fault injector, evaluation, suites), `src/lo_sim` (Gazebo rig),
-`src/third_party/small_gicp`, `patches/`, `docker/`, `scripts/`, `docs/`.
+## Fast inner loop (cheapest check that answers the question)
+```bash
+scripts/build.sh --packages-select lo_core     # only what changed (--packages-above lo_core: + dependents)
+scripts/test.sh --quick --packages-select lo_core   # seconds; --quick skips the `slow` fault suite
+scripts/test.sh --quick                        # 50 tests: unit + allocation + determinism, ~15 s
+scripts/test.sh                                # 63 tests incl. the fault suite, ~2 min: before a commit
+```
+Failures: `colcon test-result --verbose`, or `ctest --rerun-failed --output-on-failure` in
+`build/<pkg>`. Full build/test logs: `log/latest_build/<pkg>/stdout_stderr.log`, `log/latest_test/`.
+
+## Long-running work (sims, bag suites, sanitizers, soak)
+These take minutes to hours of real time and have caused most slow sessions. So:
+- Run them with `run_in_background` and wrap them in `timeout <s>`. You are notified when they
+  exit. **Never** poll with `until grep …; do sleep …; done` or `sleep` loops: a dead job turns
+  that into an unbounded wait.
+- Every command that can block (`ros2 launch`, `ros2 bag play`, `scripts/screen`, GUI tools) gets a
+  `timeout`.
+- Read results, not logs: `evaluate.py` / `bag_suite.py` print summaries; `tail`/`grep` logs.
+- Screenshots only when the task is about the GUI (each one is a large image in context).
+- Outputs go under `data/` (gitignored) or the scratchpad, never the repo root.
+- Run one heavy job at a time: parallel sims/test suites contend for the CPU (the fault suite
+  ran 3× slower next to a sim).
 
 ## Working style
 - Every accuracy/covariance change reports before/after numbers (RPE, NEES, availability,
   timing). No numbers, no claimed improvement.
 - Update `docs/PLAN.md` status and results at each phase commit; record new interpretations in
   `docs/DECISIONS.md`.
+- One task per session; `/clear` between unrelated tasks so context does not carry hours of logs.
 - Commit locally per phase on the feature branch; don't push unless asked.
