@@ -1,5 +1,7 @@
-// Optional: open the repo inside the STRIDE dev image. Claude Code normally stays on the host
-// and drives Docker through scripts/dc (CLAUDE.md); this container is for people who prefer it.
+// The STRIDE dev container (VS Code: Reopen in Container). Status-bar buttons Launch / Build /
+// Test / Screen / Stop run .vscode/tasks.json; Gazebo and RViz show on the shared screen
+// (scripts/screen, forwarded port 6080). Claude Code can also stay on the host and drive Docker
+// through scripts/dc (CLAUDE.md).
 // The workspace is mounted at its host path, so logs, compile_commands.json and Claude's
 // per-project memory key match the host.
 {
@@ -18,8 +20,13 @@
   "containerEnv": {
     "STRIDE_WS": "${localWorkspaceFolder}",
     "CCACHE_DIR": "${localWorkspaceFolder}/.ccache",
-    "BUILD_JOBS": "3"
+    "BUILD_JOBS": "3",
+    // no /dev/dri in the container: Gazebo / RViz render with Mesa llvmpipe on the shared screen
+    "LIBGL_ALWAYS_SOFTWARE": "1"
   },
+  // the shared Gazebo / RViz screen (scripts/screen: Xvfb :99 -> x11vnc -> noVNC)
+  "forwardPorts": [6080],
+  "portsAttributes": {"6080": {"label": "STRIDE screen", "onAutoForward": "silent"}},
   "mounts": [
     // test bags, read-only: the GPS-denied repo's rosbags/ (must exist on the host). Nested
     // defaults like ${localEnv:A:${localEnv:B}} are not supported by Dev Containers; to use
@@ -39,12 +46,22 @@
         "anthropic.claude-code",
         "ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
-        "ms-python.python"
+        "ms-python.python",
+        "spencerwmiles.vscode-task-buttons"
       ],
       "settings": {
-        "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json"
+        "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+        // status-bar buttons -> .vscode/tasks.json
+        "VsCodeTaskButtons.showCounter": false,
+        "VsCodeTaskButtons.tasks": [
+          {"label": "$(play) Launch", "task": "STRIDE: Launch", "tooltip": "STRIDE launcher on the shared screen"},
+          {"label": "$(tools) Build", "task": "STRIDE: Build", "tooltip": "scripts/build.sh"},
+          {"label": "$(beaker) Test", "task": "STRIDE: Test", "tooltip": "scripts/test.sh"},
+          {"label": "$(device-desktop) Screen", "task": "STRIDE: Screen", "tooltip": "Open the shared Gazebo / RViz screen"},
+          {"label": "$(debug-stop) Stop", "task": "STRIDE: Stop", "tooltip": "Stop Gazebo, RViz and STRIDE"}
+        ]
       }
     }
   },
-  "postCreateCommand": "echo 'build: scripts/build.sh   test: scripts/test.sh'"
+  "postCreateCommand": "echo 'Status bar: Launch / Build / Test / Screen / Stop (or Terminal -> Run Task)'"
 }

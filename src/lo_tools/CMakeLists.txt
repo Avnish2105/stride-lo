@@ -39,6 +39,7 @@ install(PROGRAMS
   scripts/run_fault_suite.sh
   scripts/soak.py
   scripts/time_offset.py
+  scripts/stride_launcher.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

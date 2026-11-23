@@ -92,6 +92,8 @@ public:
   virtual void onRequest(TimeNs stamp, TimeNs arrival) = 0;
   /// `true_t0`: scan start in true time (differs from scan.t0 under clock faults).
   virtual void onScan(const RawScan & scan, TimeNs arrival, TimeNs true_t0) = 0;
+  /// Polled once per scan: true ends run() early (a live rig shutting down).
+  virtual bool stopped() const {return false;}
 };
 
 class Simulator

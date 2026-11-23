@@ -202,6 +202,8 @@ void visitParams(Config & c, Visitor & v)
   v.number("recovery.timeout", c.recovery.timeout, 0.1, 600.0, "RECOVERING timeout [s]");
   v.number("recovery.gate", c.recovery.gate, 0.01, 100.0, "Recovery coarse gate [m]");
   v.integer("recovery.coarse_iters", c.recovery.coarse_iters, 1, 200, "Recovery coarse iters");
+  v.number("recovery.max_bridge", c.recovery.max_bridge, 0.1, 600.0,
+    "Recovery after a longer gap starts a new chain (no bridging factor) [s]");
   v.number("degraded.clear_time", c.degraded.clear_time, 0.0, 60.0,
     "Clean time before DEGRADED -> TRACKING [s]");
   v.number("standstill.min_duration", c.standstill.min_duration, 0.1, 60.0,

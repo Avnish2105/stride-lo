@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# STRIDE LO launcher (VS Code status bar "STRIDE: Launch", or run it in the dev container):
+# starts the shared screen (scripts/screen) and opens the launcher window on it, where you pick
+# simulation or bag replay, Gazebo / RViz / record, and press Launch. Watch and use it in the
+# browser tab (http://localhost:6080, opened for you); Claude sees the same screen.
+# Builds the workspace first if it is missing. Log: data/launcher.log.
+set -eo pipefail
+ws="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+cd "$ws"
+mkdir -p data
+exec > >(tee -a data/launcher.log) 2>&1
+echo "== $(date '+%F %T') scripts/launcher"
+
+if [[ ! -f /.dockerenv ]]; then
+  echo "Run this inside the STRIDE dev container (VS Code: Reopen in Container)."; exit 1
+fi
+set +u
+source /usr/local/bin/stride_env.sh
+if [[ ! -f install/lo_tools/lib/lo_tools/stride_launcher.py ]]; then
+  echo "Building the workspace (first run)…"
+  scripts/build.sh
+fi
+source install/setup.bash
+
+scripts/screen start
+url="$(scripts/screen url)"
+[[ -n "${BROWSER:-}" && -z "${STRIDE_NO_BROWSER:-}" ]] && "$BROWSER" "$url" >/dev/null 2>&1 || true
+
+if pgrep -f '^python3 [^ ]*lo_tools/stride_launcher.py' >/dev/null; then
+  echo "The launcher window is already open on the shared screen: $url"; exit 0
+fi
+unset WAYLAND_DISPLAY
+export DISPLAY="$(scripts/screen display)" LIBGL_ALWAYS_SOFTWARE=1
+setsid python3 "$(ros2 pkg prefix lo_tools)/lib/lo_tools/stride_launcher.py" \
+  >>data/launcher.log 2>&1 < /dev/null &
+echo "Launcher window opened on the shared screen: $url"

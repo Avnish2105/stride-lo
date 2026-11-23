@@ -67,6 +67,19 @@ decisions/interpretations: [DECISIONS.md](DECISIONS.md).
     0 false accepts, mean NEES 2.22, t_med 10.3 ms / p99 19.0 ms.
   - lo_sim live: headless room RPE 0.108 %, Gazebo crowd 0.076 % (GUI run: 0.083 %), 0 false
     accepts.
+- **Demo, Gazebo fix, integrity fix** (2026-11-23, after PR #1).
+  - VS Code status-bar buttons (Launch / Build / Test / Screen / Stop, `.vscode/tasks.json`) and a
+    shared virtual screen (`scripts/screen`: Xvfb :99 → noVNC on port 6080) that the user and
+    Claude both see. The host desktop icon and the GPU compose override are retired.
+  - Gazebo LOST: rig release timing + Gazebo clock + software-GL CPU load (I37). Live crowd with
+    Gazebo GUI + RViz + recording: availability 0.170 → 0.966, LOSTs 20 → 1 (the scenario's own),
+    clock_unstable rejects 1126 → 0, false accepts 3 → 0, RPE 13.4 % → 0.095 %, NEES 1.49.
+  - Long-gap recovery no longer bridges the gap with a factor (I38, `recovery.max_bridge` 2 s).
+    Crowd + clock_jump faults (5 cases): false accepts 4 → 0, availability −0.001 at most.
+    25-bag suite v6: identical to v5 on every bag (RPE 0.125 %, NEES 2.22, 0 false accepts,
+    availability 0.999; timing not comparable, run under load). Synthetic + fault suites:
+    0 false accepts. 62 tests green.
+  - `lo_graph_demo` no longer dies on an ill-posed new chain (I39).
 
 ---
 

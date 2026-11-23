@@ -23,7 +23,15 @@ points about the base origin with that lever arm (DECISIONS I28).
 - PTP: wire a PTP monitor to `topics.ptp_offset` (Float64, s); the limit is `clock.max_offset`
   (2 ms). The arrival-based skew proxy (`clock.check_skew`, `clock.max_skew`) assumes a stable
   transport-latency floor. Measure the floor first (I1): on the GPS-denied sim it wandered by
-  13 ms, so the proxy is off there.
+  13 ms, so the proxy is off there. The floor also moves with host load: big LiDAR messages are
+  delivered later on a busy CPU (lo_sim with the Gazebo + RViz GUIs in software GL: 8.7 ms
+  spread, I37). Prefer raising `clock.max_skew` above the measured spread to switching the
+  proxy off: off, a 50 ms LiDAR clock offset produced 38 false accepts on the crowd scene.
+  Running STRIDE on a simulator's `/clock`: the clock source must be smooth (a jittery
+  Gazebo `/clock` was what drove lo_sim LOST, I37).
+- `recovery.max_bridge` (2 s): a recovery after a longer gap since the last accepted scan
+  starts a new chain instead of emitting a bridging factor (I38). Raise it only with a fault
+  suite showing 0 false accepts across long gaps.
 - **IMU time offset** (`imu.time_offset`): replay once, then run
   ```bash
   ros2 run lo_tools lo_replay --bag BAG --robot ROBOT --out out

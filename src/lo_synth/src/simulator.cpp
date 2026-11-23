@@ -412,7 +412,7 @@ void Simulator::run(Sink & sink, double t_max)
   std::size_t ii = 0, ij = 0, ir = 0;
   const TimeNs joint_lat = fromSec(0.002);
   const TimeNs req_lat = fromSec(0.003);
-  for (std::size_t k = 0; k < num_scans; ++k) {
+  for (std::size_t k = 0; k < num_scans && !sink.stopped(); ++k) {
     const double t0 = 0.05 + static_cast<double>(k) * scan_dur;
     const TimeNs scan_arrival = fromSec(t0 + scan_dur + sc_.scan_latency);
     // deliver everything that arrives before this scan, in arrival order
