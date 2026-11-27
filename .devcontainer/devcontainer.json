@@ -3,7 +3,7 @@
 // (scripts/screen, forwarded port 6080). Claude Code can also stay on the host and drive Docker
 // through scripts/dc (CLAUDE.md).
 // The workspace is mounted at its host path, so logs, compile_commands.json and Claude's
-// per-project memory key match the host.
+// per-project session/memory keys match the host; ~/.claude and ~/.claude.json are the host's.
 {
   "name": "stride-lo (dev)",
   "build": {
@@ -12,6 +12,7 @@
     "target": "dev",
     "args": {"BUILD_JOBS": "3"}
   },
+  "initializeCommand": "bash scripts/bags_link.sh && bash scripts/claude_home.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
   "workspaceFolder": "${localWorkspaceFolder}",
   "remoteUser": "dev",
@@ -28,17 +29,16 @@
   "forwardPorts": [6080],
   "portsAttributes": {"6080": {"label": "STRIDE screen", "onAutoForward": "silent"}},
   "mounts": [
-    // test bags, read-only: the GPS-denied repo's rosbags/ (must exist on the host). Nested
-    // defaults like ${localEnv:A:${localEnv:B}} are not supported by Dev Containers; to use
-    // another bags dir, edit this path (scripts/dc honours STRIDE_BAGS_DIR instead).
-    "source=${localEnv:HOME}/GPS-denied_State_estimation_Qudrapad/rosbags,target=/data/bags,type=bind,readonly"
-    // Optional, to bring the Claude login, plans and memory into the container (uncomment;
-    // the sources must exist on the host):
-    // ,"source=${localEnv:HOME}/.claude/projects,target=/home/dev/.claude/projects,type=bind"
-    // ,"source=${localEnv:HOME}/.claude/plans,target=/home/dev/.claude/plans,type=bind"
-    // ,"source=${localEnv:HOME}/.claude/settings.json,target=/home/dev/.claude/settings.json,type=bind"
-    // ,"source=${localEnv:HOME}/.claude/.credentials.json,target=/home/dev/.claude/.credentials.json,type=bind"
-    // ,"source=${localEnv:HOME}/.claude.json,target=/home/dev/.claude.json,type=bind"
+    // test bags, read-only and optional. initializeCommand (scripts/bags_link.sh, on the host)
+    // makes the gitignored data/bags a link to $STRIDE_BAGS_DIR or the GPS-denied repo's
+    // rosbags/ when one exists, else an empty dir, so the container starts on a fresh clone.
+    "source=${localWorkspaceFolder}/data/bags,target=/data/bags,type=bind,readonly"
+    // Claude Code state of the HOST user (login, sessions, plans, memory, settings), so it
+    // survives rebuilds. Each user mounts their own ~/.claude: nothing secret is in git; a user
+    // without one logs in once and it is kept on their laptop. scripts/claude_home.sh
+    // (initializeCommand) creates the sources if missing.
+    ,"source=${localEnv:HOME}/.claude,target=/home/dev/.claude,type=bind"
+    ,"source=${localEnv:HOME}/.claude.json,target=/home/dev/.claude.json,type=bind"
   ],
   "customizations": {
     "vscode": {

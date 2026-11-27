@@ -1,6 +1,6 @@
 # STRIDE containers. Use scripts/dc (not plain `docker compose`): it exports STRIDE_WS (the
 # repo's absolute host path, mounted at the same path so logs and compile_commands.json match
-# the host), the host uid/gid and STRIDE_BAGS_DIR (mounted read-only at /data/bags).
+# the host), the host uid/gid and STRIDE_BAGS_DIR (data/bags, mounted read-only at /data/bags).
 #   scripts/dc build dev
 #   scripts/dc run --rm dev scripts/build.sh
 name: stride
@@ -32,6 +32,12 @@ services:
         USER_UID: ${STRIDE_UID:-1000}
         USER_GID: ${STRIDE_GID:-1000}
     image: stride-lo:dev
+    volumes:   # replaces the common list: repeat it, plus the host user's Claude state
+      - ${STRIDE_WS}:${STRIDE_WS}
+      - ${STRIDE_BAGS_DIR}:/data/bags:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${HOME}/.claude:/home/dev/.claude        # scripts/claude_home.sh creates both if missing
+      - ${HOME}/.claude.json:/home/dev/.claude.json
     user: "${STRIDE_UID:-1000}:${STRIDE_GID:-1000}"
 
   ci:

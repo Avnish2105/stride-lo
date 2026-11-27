@@ -62,6 +62,11 @@ the scripts and a bare `colcon build` (Ninja, ccache, symlink install, quiet out
 
 ## Demo: buttons in VS Code
 
+**Claude Code in the container** uses your laptop's `~/.claude` and `~/.claude.json` (bind-mounted
+by the devcontainer and `scripts/dc`; `scripts/claude_home.sh` creates them if missing), so the
+login, session history, plans and memory survive container rebuilds. Each user mounts their own:
+no credentials are in the repo, and a first-time user logs in once.
+
 Open the repo in the dev container (VS Code: **Reopen in Container**). The status bar then has
 five buttons (from `.vscode/tasks.json`, also under *Terminal → Run Task*):
 
@@ -180,8 +185,11 @@ ros2 run lo_tools live_check.sh BAG live_out 60                             # li
 
 Two sources: the synthetic simulator (`lo_synth`, `lo_sim`) and recorded/simulated bags from the
 GPS-denied estimator project (25 trotting ANYmal C runs, used for the results above). Bags are
-read from `STRIDE_BAGS_DIR`, which defaults to `~/GPS-denied_State_estimation_Qudrapad/rosbags`
-if that exists and to `./data` otherwise. `data/` is gitignored local scratch: replay
+optional and not in git. `scripts/bags_link.sh` (run by `scripts/dc` and by the devcontainer's
+`initializeCommand`) makes `data/bags` a link to `STRIDE_BAGS_DIR`, or to
+`~/GPS-denied_State_estimation_Qudrapad/rosbags` if that exists, or an empty directory otherwise
+(you can also copy bags into `data/bags`); it is mounted read-only at `/data/bags`, so the
+container starts on a fresh clone either way. `data/` is gitignored local scratch: replay
 outputs, `SUITE.md`/`*.eval.json` results of suite runs, sweep and kappa runs, and build/test
 logs. Nothing in the repo needs it.
 
